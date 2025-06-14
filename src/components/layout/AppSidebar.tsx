@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -50,7 +51,7 @@ export function AppSidebar() {
           <SidebarMenu className="px-2">
             {NAV_LINKS_MAIN.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref legacyBehavior onClick={handleLinkClick}>
+                <Link href={item.href} onClick={handleLinkClick}>
                   <SidebarMenuButton
                     isActive={isActive(item)}
                     tooltip={{ children: item.label, className: "font-body" }}
@@ -70,7 +71,7 @@ export function AppSidebar() {
       <SidebarSeparator />
 
       <SidebarFooter className="p-3">
-          <Link href="/profile" passHref legacyBehavior onClick={handleLinkClick}>
+          <Link href="/profile" onClick={handleLinkClick}>
             <Button variant="ghost" className={cn("w-full justify-start gap-2 px-2", sidebarState === 'collapsed' && !isMobile && "justify-center Aspect-square p-0")}>
               <Avatar className="h-8 w-8">
                 <AvatarImage src="https://placehold.co/100x100.png" alt="User avatar" data-ai-hint="user avatar" />
@@ -86,3 +87,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
