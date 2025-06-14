@@ -87,7 +87,7 @@ export function AppHeader() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <LanguageSelector selectedLanguage={currentLanguage} onLanguageChange={handleLanguageChange} />
             <ModeSelector selectedMode={currentMode} onModeChange={handleModeChange} />
           </div>

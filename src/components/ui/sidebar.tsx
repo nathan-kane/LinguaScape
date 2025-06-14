@@ -2,7 +2,6 @@
 "use client";
 
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
 import { ChevronLeft, PanelLeft, SearchIcon } from "lucide-react";
 
@@ -23,12 +22,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Slot } from "@radix-ui/react-slot";
 
+const MOBILE_BREAKPOINT = 768; // Standard md breakpoint
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 const SIDEBAR_WIDTH = "16rem"; // Equivalent to w-64
-const SIDEBAR_WIDTH_MOBILE = "18rem"; // Equivalent to w-72
-const SIDEBAR_WIDTH_ICON = "3rem"; // Equivalent to w-12
+const SIDEBAR_WIDTH_MOBILE = "18rem"; // Equivalent to w-72 for mobile sheet
+const SIDEBAR_WIDTH_ICON = "3.5rem"; // Increased slightly for better icon display w-14
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContextValue = {
@@ -38,13 +39,13 @@ type SidebarContextValue = {
   isMobile: boolean;
   toggleSidebar: () => void;
   openMobile: boolean;
-  setOpenMobile: (open: boolean) => void;
-  mounted: boolean; // Added mounted state
+  setOpenMobile: (open: boolean | ((prevState: boolean) => boolean)) => void;
+  mounted: boolean;
 };
 
 const SidebarContext = React.createContext<SidebarContextValue | null>(null);
 
-function useSidebar() {
+export function useSidebar() {
   const context = React.useContext(SidebarContext);
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider.");
@@ -52,7 +53,7 @@ function useSidebar() {
   return context;
 }
 
-const SidebarProvider = React.forwardRef<
+export const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
     defaultOpen?: boolean;
@@ -60,41 +61,45 @@ const SidebarProvider = React.forwardRef<
     onOpenChange?: (open: boolean) => void;
   }
 >(
-  (
-    {
-      defaultOpen = true,
-      open: openProp,
-      onOpenChange: setOpenProp,
-      className,
-      style,
-      children,
-      ...props
-    },
-    ref
-  ) => {
+  (props, ref) => {
+    const { defaultOpen = true, open: openProp, onOpenChange: setOpenProp, className, style, children, ...restProps } = props;
     const [openState, _setOpenState] = React.useState(defaultOpen);
-    const [openMobileState, setOpenMobileState] = React.useState(false);
-    const [isMobile, setIsMobile] = React.useState(false);
-    const [mounted, setMounted] = React.useState(false); // Added mounted state
+    const [isMobile, setIsMobile] = React.useState(false); // Initial value, will be updated client-side
+    const [mounted, setMounted] = React.useState(false);
+    const [openMobile, setOpenMobile] = React.useState(false);
 
     React.useEffect(() => {
-      setMounted(true); // Set mounted to true after initial render
-      // Client-side: if uncontrolled, sync with cookie after initial mount
+      setMounted(true); // Indicates client-side execution
+
+      const handleResize = () => {
+        setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+      };
+      
+      handleResize(); // Initial check on mount
+      window.addEventListener("resize", handleResize);
+      
+      // Cookie logic: Read cookie only if component is uncontrolled and on initial mount
       if (openProp === undefined) {
         const cookie = document.cookie
           .split("; ")
           .find((row) => row.startsWith(`${SIDEBAR_COOKIE_NAME}=`));
         if (cookie) {
           const cookieValue = cookie.split("=")[1] === "true";
-          if (cookieValue !== openState) {
+          // Set state from cookie if different from initial openState (derived from defaultOpen)
+          // This check helps prevent unnecessary re-renders if cookie matches default
+          if (cookieValue !== openState) { 
             _setOpenState(cookieValue);
           }
         }
       }
-    }, [openProp, openState]); // Removed defaultOpen dependency to avoid loop with cookie read
+      
+      return () => {
+        window.removeEventListener("resize", handleResize);
+      };
+    }, [openProp]); // Effect runs on mount and if openProp changes (e.g. from undefined to value)
 
     const isOpen = openProp ?? openState;
-
+    
     const setOpen = React.useCallback(
       (value: boolean | ((current: boolean) => boolean)) => {
         const newOpenState = typeof value === "function" ? value(isOpen) : value;
@@ -102,35 +107,22 @@ const SidebarProvider = React.forwardRef<
           setOpenProp(newOpenState);
         } else {
           _setOpenState(newOpenState);
-          if (typeof document !== "undefined") {
+          if (mounted) { // Ensure document is available (client-side)
             document.cookie = `${SIDEBAR_COOKIE_NAME}=${newOpenState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
           }
         }
       },
-      [setOpenProp, isOpen]
+      [setOpenProp, isOpen, mounted] // mounted added as dependency
     );
     
-    const setOpenMobile = React.useCallback((value: boolean) => {
-      setOpenMobileState(value);
-    }, []);
-
-    React.useEffect(() => {
-      const handleResize = () => setIsMobile(window.innerWidth < 768);
-      if (mounted) { // Only add listener after mount
-        handleResize(); 
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-      }
-    }, [mounted]);
-
-    const toggleSidebar = React.useCallback(() => {
+    const toggleSidebar: () => void = React.useCallback(() => {
       if (isMobile) {
         setOpenMobile((v) => !v);
       } else {
-        setOpen((v) => !v);
+        setOpen((v) => !v); // setOpen will handle cookie logic
       }
-    }, [isMobile, setOpen, setOpenMobile]);
-
+    }, [isMobile, setOpen]);
+    
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
@@ -145,12 +137,21 @@ const SidebarProvider = React.forwardRef<
     }, [toggleSidebar, mounted]);
 
     const currentUiState = isMobile ? "expanded" : isOpen ? "expanded" : "collapsed";
-
+    
     const contextValue = React.useMemo<SidebarContextValue>(
-      () => ({ state: currentUiState, open: isOpen, setOpen, isMobile, toggleSidebar, openMobile: openMobileState, setOpenMobile, mounted }),
-      [currentUiState, isOpen, setOpen, isMobile, toggleSidebar, openMobileState, setOpenMobile, mounted]
+      () => ({ 
+        state: currentUiState, 
+        open: isOpen, 
+        setOpen,
+        isMobile, 
+        toggleSidebar, 
+        openMobile, 
+        setOpenMobile, 
+        mounted 
+      }),
+      [currentUiState, isOpen, setOpen, isMobile, toggleSidebar, openMobile, setOpenMobile, mounted]
     );
-
+ 
     return (
       <SidebarContext.Provider value={contextValue}>
         <TooltipProvider delayDuration={0}>
@@ -163,7 +164,7 @@ const SidebarProvider = React.forwardRef<
             } as React.CSSProperties}
             className={cn("group/sidebar-wrapper flex min-h-screen", className)}
             ref={ref}
-            {...props}
+            {...restProps}
           >
             {children}
           </div>
@@ -175,7 +176,7 @@ const SidebarProvider = React.forwardRef<
 SidebarProvider.displayName = "SidebarProvider";
 
 const sidebarVariants = cva(
-  "fixed inset-y-0 z-40 flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg transition-[width,transform] duration-300 ease-in-out print:hidden",
+  "fixed inset-y-0 z-40 flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg transition-[width,transform] duration-300 ease-in-out print:hidden data-[side=right]:border-l data-[side=right]:border-r-0",
   {
     variants: {
       variant: {
@@ -183,11 +184,6 @@ const sidebarVariants = cva(
           "group-data-[state=collapsed]/sidebar:w-[var(--sidebar-width-icon)] group-data-[state=expanded]/sidebar:w-[var(--sidebar-width)]",
         icon: "group-data-[state=collapsed]/sidebar:w-[var(--sidebar-width-icon)] group-data-[state=expanded]/sidebar:w-[var(--sidebar-width-icon)]",
         wide: "group-data-[state=collapsed]/sidebar:w-[var(--sidebar-width-icon)] group-data-[state=expanded]/sidebar:w-[var(--sidebar-width-mobile)]",
-        // Offcanvas variant removed from here as it's handled by Sheet logic
-      },
-      collapsible: {
-        true: "",
-        false: "",
       },
       side: {
         left: "left-0",
@@ -196,7 +192,6 @@ const sidebarVariants = cva(
     },
     defaultVariants: {
       variant: "default",
-      collapsible: true,
       side: "left",
     },
   }
@@ -206,22 +201,21 @@ type SidebarRootProps = React.ComponentProps<"aside"> &
   VariantProps<typeof sidebarVariants>;
 
 const Sidebar = React.forwardRef<HTMLDivElement, SidebarRootProps>(
-  ({ className, variant, collapsible, side, ...props }, ref) => {
+  ({ className, variant, side, ...props }, ref) => {
     const { state, isMobile, openMobile, setOpenMobile, mounted } = useSidebar();
     
     if (!mounted) {
       // SSR and initial client render: always render the desktop <aside> structure.
-      // 'state' from context is based on 'defaultOpen' and assumes isMobile=false for this phase.
-      // 'variant' should be the one passed or default, not decided by a premature 'isMobile'.
+      // 'state' here is based on 'defaultOpen' (from SidebarProvider) as isMobile is false.
       const ssrClientVariant = variant ?? "default"; 
       return (
         <aside
           ref={ref}
           className={cn(
             "group/sidebar",
-            sidebarVariants({ variant: ssrClientVariant, collapsible, side, className })
+            sidebarVariants({ variant: ssrClientVariant, side, className })
           )}
-          data-state={state} // This 'state' is ('expanded'/'collapsed') based on 'defaultOpen'
+          data-state={state} // state is 'expanded' or 'collapsed' based on defaultOpen
           {...props}
         />
       );
@@ -237,10 +231,9 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarRootProps>(
               "m-0 flex h-full flex-col gap-0 p-0 shadow-none",
               side === "right" ? "border-l" : "border-r",
               "w-[var(--sidebar-width-mobile)] bg-sidebar text-sidebar-foreground",
-              className // Allow overriding className
+              className 
             )}
           >
-            {/* Children (SidebarHeader, SidebarContent, etc.) are passed here */}
             {props.children} 
           </SheetContent>
         </Sheet>
@@ -254,9 +247,9 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarRootProps>(
         ref={ref}
         className={cn(
           "group/sidebar",
-          sidebarVariants({ variant: desktopVariant, collapsible, side, className })
+          sidebarVariants({ variant: desktopVariant, side, className })
         )}
-        data-state={state} // Current context state
+        data-state={state} // current context state reflecting cookie or prop
         {...props}
       />
     );
@@ -499,16 +492,15 @@ type SidebarInsetProps = React.ComponentProps<"div"> &
     asChild?: boolean;
   };
 
-const SidebarInset = React.forwardRef<HTMLDivElement, SidebarInsetProps>(
+export const SidebarInset = React.forwardRef<HTMLDivElement, SidebarInsetProps>(
   ({ className, asChild, side = "left", ...props }, ref) => {
     const { state: currentUiState, isMobile, mounted } = useSidebar();
     const Comp = asChild ? Slot : "div";
 
-    if (!mounted || isMobile) { // If not mounted or if mobile, don't apply dynamic padding
+    if (!mounted || isMobile) { 
       return <Comp ref={ref} className={cn("flex-1", className)} {...props} />;
     }
 
-    // Apply dynamic padding only on desktop after mount
     return (
       <Comp
         ref={ref}
@@ -526,8 +518,8 @@ const SidebarSearch = React.forwardRef<
   React.ComponentProps<typeof Input>
 >(({ className, ...props }, ref) => {
   const { state: currentUiState, isMobile, mounted } = useSidebar();
-  if (!mounted) { // Render a placeholder or basic input for SSR/initial client if needed
-    return <Input ref={ref} className={cn("sr-only", className)} {...props} />; // Example: hide initially
+  if (!mounted) { 
+    return <Input ref={ref} className={cn("sr-only", className)} {...props} />; 
   }
   return (
     <div className="relative px-2">
@@ -553,7 +545,7 @@ const SidebarToggle = React.forwardRef<
   Omit<ButtonProps, "size">
 >(({ className, children, ...props }, ref) => {
   const { toggleSidebar, isMobile, state: currentUiState, mounted } = useSidebar(); 
-  if (!mounted || isMobile) return null; // Only show toggle on desktop after mount
+  if (!mounted || isMobile) return null;
 
   return (
     <Button
@@ -582,10 +574,9 @@ const SidebarToggle = React.forwardRef<
   );
 });
 SidebarToggle.displayName = "SidebarToggle";
-
-export {
-  SidebarProvider,
-  useSidebar,
+ 
+export { 
+  // SidebarProvider and useSidebar are already exported above
   Sidebar,
   SidebarHeader,
   SidebarBrand,
@@ -599,6 +590,5 @@ export {
   SidebarSearch,
   SidebarToggle,
   SidebarSheetClose,
-  SidebarInset,
+  // SidebarInset is already exported above
 };
-
