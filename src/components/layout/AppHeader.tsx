@@ -18,7 +18,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Logo } from "@/components/shared/Logo";
 import { LanguageSelector } from "@/components/shared/LanguageSelector";
 import { ModeSelector } from "@/components/shared/ModeSelector";
-import { NAV_LINKS_MAIN, NAV_LINKS_USER, DEFAULT_LANGUAGE, DEFAULT_MODE, APP_NAME } from "@/lib/constants";
+import { NAV_LINKS_USER, DEFAULT_LANGUAGE, DEFAULT_MODE } from "@/lib/constants";
 import type { Language, LearningMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar"; 
@@ -26,39 +26,53 @@ import { useSidebar } from "@/components/ui/sidebar";
 export function AppHeader() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  
   const [currentLanguage, setCurrentLanguage] = useState<Language>(DEFAULT_LANGUAGE);
   const [currentMode, setCurrentMode] = useState<LearningMode>(DEFAULT_MODE);
-  
   const { toggleSidebar, isMobile } = useSidebar(); 
 
-  useEffect(() => setMounted(true), []);
+  // State for theme, to be updated after mount
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light'); // Default to light for server/initial client
+
+  useEffect(() => {
+    setMounted(true);
+    // Determine and set initial theme after mount
+    const isDark = document.documentElement.classList.contains('dark');
+    setEffectiveTheme(isDark ? 'dark' : 'light');
+
+    // Optional: Listen to changes on documentElement if theme can be changed by other means
+    // For instance, if a global theme switcher modifies the class directly.
+    const observer = new MutationObserver(() => {
+      const currentlyDark = document.documentElement.classList.contains('dark');
+      setEffectiveTheme(currentlyDark ? 'dark' : 'light');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    
+    return () => observer.disconnect();
+  }, []);
+
 
   const handleLanguageChange = (newLanguage: Language) => {
     setCurrentLanguage(newLanguage);
     // In a real app, you might save this preference.
+    console.log("Language changed to:", newLanguage.name);
   };
 
   const handleModeChange = (newMode: LearningMode) => {
     setCurrentMode(newMode);
     // In a real app, you might save this preference.
-  };
-
-  // Placeholder theme toggle function
-  const toggleTheme = () => {
-    // Actual theme toggling logic would go here
-    if (document.documentElement.classList.contains('dark')) {
-      document.documentElement.classList.remove('dark');
-    } else {
-      document.documentElement.classList.add('dark');
-    }
-    // Force a re-render if necessary to update the icon, though DOM change should be enough for CSS
-    setMounted(m => !m); 
-    setMounted(m => !m); // Toggling twice to ensure state change if icon depends on 'mounted' state for dark class
+    console.log("Mode changed to:", newMode.name);
   };
   
-  const ThemeIcon = mounted && typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? Sun : Moon;
-
+  const toggleTheme = () => {
+    const isCurrentlyDark = document.documentElement.classList.contains('dark');
+    if (isCurrentlyDark) {
+      document.documentElement.classList.remove('dark');
+      setEffectiveTheme('light');
+    } else {
+      document.documentElement.classList.add('dark');
+      setEffectiveTheme('dark');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -78,9 +92,15 @@ export function AppHeader() {
             <ModeSelector selectedMode={currentMode} onModeChange={handleModeChange} />
           </div>
 
-          {mounted && (
+          {/* Theme Toggle Button */}
+          {mounted ? (
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-              <ThemeIcon className="h-5 w-5" />
+              {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+          ) : (
+            // Render a placeholder or disabled button server-side and on initial client render
+            <Button variant="ghost" size="icon" aria-label="Toggle theme" disabled>
+              <Moon className="h-5 w-5" /> {/* Matches initial effectiveTheme state ('light') */}
             </Button>
           )}
 
@@ -124,7 +144,7 @@ export function AppHeader() {
                     <Settings className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <SheetContent side="right" className="w-[300px] sm:w-[400px] z-[70]"> {/* Increased z-index for sheet content */}
                   <div className="p-6 space-y-4">
                     <h3 className="text-lg font-medium">Settings</h3>
                     <LanguageSelector selectedLanguage={currentLanguage} onLanguageChange={handleLanguageChange} className="w-full" />
