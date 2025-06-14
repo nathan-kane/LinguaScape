@@ -1,7 +1,8 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
 import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants';
+import RootLayoutClient from '@/components/layout/RootLayoutClient'; // Import the new client component
 
 export const metadata: Metadata = {
   title: APP_NAME,
@@ -23,8 +24,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>
   );
