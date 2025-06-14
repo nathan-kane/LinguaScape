@@ -1,12 +1,14 @@
 
+"use client"; // Add this if not present, for useState and useEffect
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/shared/Logo";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
-import { Brain, MicVocal, BookText, Headphones, Flame, Sparkles, CheckCircle, BookOpen, Edit3, Mic, Languages } from "lucide-react";
+import { Brain, MicVocal, BookText, Headphones, Flame, Sparkles, CheckCircle, BookOpen, Edit3, Mic, Languages, UserCircle as UserCircleIcon } from "lucide-react"; // Renamed UserCircle to avoid conflict
 import Link from "next/link";
 import Image from "next/image";
-import React from "react";
+import React, { useState, useEffect } from "react"; // Import useState and useEffect
 
 const keyFeatures = [
   {
@@ -81,6 +83,12 @@ const howItWorksSteps = [
 ];
 
 export default function HomePage() {
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background to-secondary/10 font-body">
       <header className="sticky top-0 z-50 py-4 px-4 sm:px-6 lg:px-8 bg-background/80 backdrop-blur-md border-b border-border">
@@ -280,7 +288,11 @@ export default function HomePage() {
             </nav>
           </div>
           <p className="text-sm text-muted-foreground text-center mt-6">
-            &copy; {new Date().getFullYear()} {APP_NAME}. All rights reserved. {APP_DESCRIPTION}
+            {currentYear !== null ? (
+              `© ${currentYear} ${APP_NAME}. All rights reserved. ${APP_DESCRIPTION}`
+            ) : (
+              `© ${APP_NAME}. All rights reserved. ${APP_DESCRIPTION}` // Fallback before year loads
+            )}
           </p>
         </div>
       </footer>
