@@ -1,17 +1,18 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-// Label import removed as it's no longer used in this file
 import { Flame, BookOpen, Mic, Edit3, Headphones, Activity, Award, CalendarDays, Users, SlidersHorizontal, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-// LanguageSelector and ModeSelector imports removed as they are no longer used directly in this file
 import type { Language, LearningMode } from "@/lib/types";
 import { SUPPORTED_LANGUAGES, LEARNING_MODES, DEFAULT_LANGUAGE, DEFAULT_MODE } from "@/lib/constants";
+import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { app } from '@/lib/firebase';
 
 const quickLinks = [
   { title: "Vocabulary Practice", href: "/vocabulary", icon: BookOpen, description: "Review your flashcards." },
@@ -21,14 +22,49 @@ const quickLinks = [
 ];
 
 export default function DashboardPage() {
-  // Placeholder data
-  const userName = "Alex";
-  const currentStreak = 15;
-  const wordsLearned = 250;
-  const lessonsCompletedToday = 3;
+  const [userName, setUserName] = useState<string>("Learner");
+  const [currentStreak, setCurrentStreak] = useState(15); // Placeholder
+  const [wordsLearned, setWordsLearned] = useState(250); // Placeholder
+  const [lessonsCompletedToday, setLessonsCompletedToday] = useState(3); // Placeholder
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>(DEFAULT_LANGUAGE);
   const [currentMode, setCurrentMode] = useState<LearningMode>(DEFAULT_MODE);
+
+  useEffect(() => {
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDocRef = doc(db, "users", user.uid);
+        try {
+          const docSnap = await getDoc(userDocRef);
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            if (userData && userData.displayName) {
+              setUserName(userData.displayName);
+            } else if (user.displayName) {
+              setUserName(user.displayName);
+            }
+          } else if (user.displayName) {
+            setUserName(user.displayName);
+          }
+          // Future: fetch streak, wordsLearned etc.
+        } catch (error) {
+          console.error("Error fetching user data for dashboard:", error);
+          // Use auth display name as a fallback if Firestore fetch fails
+          if (user.displayName) {
+            setUserName(user.displayName);
+          }
+        }
+      } else {
+        setUserName("Learner"); // Reset if user logs out
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   const handleLanguageChange = (language: Language) => {
     setCurrentLanguage(language);
@@ -109,8 +145,6 @@ export default function DashboardPage() {
           </div>
         </section>
         
-        {/* Learning Preferences section removed */}
-
         <section>
           <h2 className="text-2xl font-headline font-semibold text-foreground mb-4">Your Learning Path</h2>
           <Card className="shadow-lg bg-card">
