@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/shared/Logo";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
-import { Brain, MicVocal, BookText, Headphones, Flame, Sparkles, CheckCircle, BookOpen, Edit3, Mic } from "lucide-react";
+import { Brain, MicVocal, BookText, Headphones, Flame, Sparkles, CheckCircle, BookOpen, Edit3, Mic, Languages } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import React from "react";
