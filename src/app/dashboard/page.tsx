@@ -1,9 +1,18 @@
+
+"use client";
+
+import { useState } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Flame, BookOpen, Mic, Edit3, Headphones, Activity, Award, CalendarDays, Users } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Flame, BookOpen, Mic, Edit3, Headphones, Activity, Award, CalendarDays, Users, SlidersHorizontal, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { LanguageSelector } from "@/components/shared/LanguageSelector";
+import { ModeSelector } from "@/components/shared/ModeSelector";
+import type { Language, LearningMode } from "@/lib/types";
+import { SUPPORTED_LANGUAGES, LEARNING_MODES, DEFAULT_LANGUAGE, DEFAULT_MODE } from "@/lib/constants";
 
 const quickLinks = [
   { title: "Vocabulary Practice", href: "/vocabulary", icon: BookOpen, description: "Review your flashcards." },
@@ -18,6 +27,21 @@ export default function DashboardPage() {
   const currentStreak = 15;
   const wordsLearned = 250;
   const lessonsCompletedToday = 3;
+
+  const [currentLanguage, setCurrentLanguage] = useState<Language>(DEFAULT_LANGUAGE);
+  const [currentMode, setCurrentMode] = useState<LearningMode>(DEFAULT_MODE);
+
+  const handleLanguageChange = (language: Language) => {
+    setCurrentLanguage(language);
+    // In a real app, you would likely save this preference
+    console.log("Selected language:", language.name);
+  };
+
+  const handleModeChange = (mode: LearningMode) => {
+    setCurrentMode(mode);
+    // In a real app, you would likely save this preference
+    console.log("Selected mode:", mode.name);
+  };
 
   return (
     <AuthenticatedLayout>
@@ -85,6 +109,44 @@ export default function DashboardPage() {
             ))}
           </div>
         </section>
+
+        <section>
+          <h2 className="text-2xl font-headline font-semibold text-foreground mb-4">Learning Preferences</h2>
+          <Card className="shadow-lg bg-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl font-headline">
+                <SlidersHorizontal className="h-6 w-6 text-primary"/>
+                Adjust Your Focus
+              </CardTitle>
+              <CardDescription>Select the language and learning style you want to focus on.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="language-select-dashboard" className="text-sm font-medium">Target Language</Label>
+                <LanguageSelector
+                  selectedLanguage={currentLanguage}
+                  onLanguageChange={handleLanguageChange}
+                  className="w-full"
+                  // id="language-select-dashboard" // The button inside will have its own aria-label
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mode-select-dashboard" className="text-sm font-medium">Learning Mode</Label>
+                <ModeSelector
+                  selectedMode={currentMode}
+                  onModeChange={handleModeChange}
+                  className="w-full"
+                  // id="mode-select-dashboard" // The button inside will have its own aria-label
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
+                Save Preferences
+              </Button>
+            </CardFooter>
+          </Card>
+        </section>
         
         <section>
           <h2 className="text-2xl font-headline font-semibold text-foreground mb-4">Your Learning Path</h2>
@@ -102,7 +164,7 @@ export default function DashboardPage() {
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-primary mb-2">Next Up: Mastering Past Tense</h3>
                   <p className="text-muted-foreground mb-4">
-                    You're making great strides in conversational Spanish. The next module focuses on past tense verbs to help you share your experiences.
+                    You're making great strides in {currentLanguage.name}. The next module focuses on past tense verbs to help you share your experiences.
                   </p>
                   <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
                     Continue Learning Path
@@ -166,3 +228,5 @@ export default function DashboardPage() {
     </AuthenticatedLayout>
   );
 }
+
+    
