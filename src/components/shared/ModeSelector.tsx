@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -44,7 +45,7 @@ export function ModeSelector({ selectedMode, onModeChange, className }: ModeSele
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent className="w-[200px] p-0 z-[60]">
         <Command>
           <CommandInput placeholder="Search mode..." />
           <CommandList>
