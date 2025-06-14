@@ -1,3 +1,4 @@
+
 "use client";
 
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
@@ -10,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getPronunciationFeedback, PronunciationFeedbackInput, PronunciationFeedbackOutput } from "@/ai/flows/pronunciation-feedback";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils"; // Added missing import
 
 const phrasesToPractice = [
   { id: "1", text: "The quick brown fox jumps over the lazy dog.", language: "English" },
