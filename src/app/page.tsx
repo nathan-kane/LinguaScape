@@ -94,7 +94,7 @@ export default function HomePage() {
               <Link href="#languages">Languages</Link>
             </Button> */}
             <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 sm:px-6">
-              <Link href="/dashboard">Get Started</Link>
+              <Link href="/signup">Get Started</Link>
             </Button>
           </nav>
         </div>
@@ -121,7 +121,7 @@ export default function HomePage() {
                 Our intelligent system and real-world approach transform common language learning struggles into confident, natural conversations.
               </p>
               <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-shadow" asChild>
-                <Link href="/dashboard">Start Your Free Journey Today!</Link>
+                <Link href="/signup">Start Your Free Journey Today!</Link>
               </Button>
             </div>
           </div>
@@ -261,7 +261,7 @@ export default function HomePage() {
                 ))}
             </div>
             <Button size="lg" variant="secondary" className="text-lg px-8 py-6 bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg hover:shadow-xl transition-shadow" asChild>
-              <Link href="/dashboard">Start Your Free Trial Today!</Link>
+              <Link href="/signup">Start Your Free Trial Today!</Link>
             </Button>
           </div>
         </section>
