@@ -2,24 +2,16 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
+import { SUPPORTED_LANGUAGES } from "@/lib/constants";
 import type { Language } from "@/lib/types";
 
 interface LanguageSelectorProps {
@@ -29,54 +21,39 @@ interface LanguageSelectorProps {
 }
 
 export function LanguageSelector({ selectedLanguage, onLanguageChange, className }: LanguageSelectorProps) {
-  const [open, setOpen] = React.useState(false);
+  const handleValueChange = (value: string) => {
+    const newLanguage = SUPPORTED_LANGUAGES.find(lang => lang.code === value);
+    if (newLanguage) {
+      onLanguageChange(newLanguage);
+    }
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn("w-[200px] justify-between", className)}
-          aria-label={`Select language, current: ${selectedLanguage.name}`}
-        >
+    <Select
+      value={selectedLanguage.code}
+      onValueChange={handleValueChange}
+    >
+      <SelectTrigger 
+        className={cn("w-[200px] justify-between", className)}
+        aria-label={`Select language, current: ${selectedLanguage.name}`}
+      >
+        <SelectValue placeholder="Select language">
           <span className="truncate">
             {selectedLanguage.flag && <span className="mr-2">{selectedLanguage.flag}</span>}
             {selectedLanguage.name}
           </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0 z-[1000]">
-        <Command>
-          <CommandInput placeholder="Search language..." />
-          <CommandList>
-            <CommandEmpty>No language found.</CommandEmpty>
-            <CommandGroup>
-              {SUPPORTED_LANGUAGES.map((language) => (
-                <CommandItem
-                  key={language.code}
-                  value={language.name}
-                  onSelect={() => {
-                    onLanguageChange(language);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedLanguage.code === language.code ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {language.flag && <span className="mr-2">{language.flag}</span>}
-                  {language.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent className="z-[1000]"> {/* Maintain high z-index */}
+        {SUPPORTED_LANGUAGES.map((language) => (
+          <SelectItem key={language.code} value={language.code}>
+            <div className="flex items-center">
+              {language.flag && <span className="mr-2">{language.flag}</span>}
+              {language.name}
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
