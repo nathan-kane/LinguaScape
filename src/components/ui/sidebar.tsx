@@ -37,8 +37,9 @@ type SidebarContextValue = {
   setOpen: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
-  openMobile: boolean; // Added for mobile sheet control
-  setOpenMobile: (open: boolean) => void; // Added for mobile sheet control
+  openMobile: boolean;
+  setOpenMobile: (open: boolean) => void;
+  mounted: boolean; // Added mounted state
 };
 
 const SidebarContext = React.createContext<SidebarContextValue | null>(null);
@@ -71,10 +72,13 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const [openState, _setOpenState] = React.useState(defaultOpen); // Initialize with defaultOpen for SSR and initial client render
+    const [openState, _setOpenState] = React.useState(defaultOpen);
     const [openMobileState, setOpenMobileState] = React.useState(false);
+    const [isMobile, setIsMobile] = React.useState(false);
+    const [mounted, setMounted] = React.useState(false); // Added mounted state
 
     React.useEffect(() => {
+      setMounted(true); // Set mounted to true after initial render
       // Client-side: if uncontrolled, sync with cookie after initial mount
       if (openProp === undefined) {
         const cookie = document.cookie
@@ -87,7 +91,7 @@ const SidebarProvider = React.forwardRef<
           }
         }
       }
-    }, [openProp, defaultOpen, openState]); // Rerun if openState changes externally or defaultOpen prop changes
+    }, [openProp, openState]); // Removed defaultOpen dependency to avoid loop with cookie read
 
     const isOpen = openProp ?? openState;
 
@@ -110,19 +114,20 @@ const SidebarProvider = React.forwardRef<
       setOpenMobileState(value);
     }, []);
 
-    const [isMobile, setIsMobile] = React.useState(false);
     React.useEffect(() => {
       const handleResize = () => setIsMobile(window.innerWidth < 768);
-      handleResize(); // Initial check
-      window.addEventListener("resize", handleResize);
-      return () => window.removeEventListener("resize", handleResize);
-    }, []);
+      if (mounted) { // Only add listener after mount
+        handleResize(); 
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+      }
+    }, [mounted]);
 
     const toggleSidebar = React.useCallback(() => {
       if (isMobile) {
         setOpenMobile((v) => !v);
       } else {
-        setOpen((v) => !v); // Uses the enhanced setOpen
+        setOpen((v) => !v);
       }
     }, [isMobile, setOpen, setOpenMobile]);
 
@@ -133,15 +138,17 @@ const SidebarProvider = React.forwardRef<
           toggleSidebar();
         }
       };
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [toggleSidebar]);
+      if (mounted) { // Only add listener after mount
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+      }
+    }, [toggleSidebar, mounted]);
 
     const currentUiState = isMobile ? "expanded" : isOpen ? "expanded" : "collapsed";
 
     const contextValue = React.useMemo<SidebarContextValue>(
-      () => ({ state: currentUiState, open: isOpen, setOpen, isMobile, toggleSidebar, openMobile: openMobileState, setOpenMobile }),
-      [currentUiState, isOpen, setOpen, isMobile, toggleSidebar, openMobileState, setOpenMobile]
+      () => ({ state: currentUiState, open: isOpen, setOpen, isMobile, toggleSidebar, openMobile: openMobileState, setOpenMobile, mounted }),
+      [currentUiState, isOpen, setOpen, isMobile, toggleSidebar, openMobileState, setOpenMobile, mounted]
     );
 
     return (
@@ -154,7 +161,7 @@ const SidebarProvider = React.forwardRef<
               "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
               ...style,
             } as React.CSSProperties}
-            className={cn("group/sidebar-wrapper flex min-h-screen", className)} // Ensure full height for flex
+            className={cn("group/sidebar-wrapper flex min-h-screen", className)}
             ref={ref}
             {...props}
           >
@@ -176,8 +183,7 @@ const sidebarVariants = cva(
           "group-data-[state=collapsed]/sidebar:w-[var(--sidebar-width-icon)] group-data-[state=expanded]/sidebar:w-[var(--sidebar-width)]",
         icon: "group-data-[state=collapsed]/sidebar:w-[var(--sidebar-width-icon)] group-data-[state=expanded]/sidebar:w-[var(--sidebar-width-icon)]",
         wide: "group-data-[state=collapsed]/sidebar:w-[var(--sidebar-width-icon)] group-data-[state=expanded]/sidebar:w-[var(--sidebar-width-mobile)]",
-        offcanvas:
-          "translate-x-[-100%] data-[state=expanded]:translate-x-0 data-[state=expanded]:w-[var(--sidebar-width-mobile)]",
+        // Offcanvas variant removed from here as it's handled by Sheet logic
       },
       collapsible: {
         true: "",
@@ -201,35 +207,56 @@ type SidebarRootProps = React.ComponentProps<"aside"> &
 
 const Sidebar = React.forwardRef<HTMLDivElement, SidebarRootProps>(
   ({ className, variant, collapsible, side, ...props }, ref) => {
-    const { state, isMobile, openMobile, setOpenMobile } = useSidebar();
-    const currentVariant = isMobile ? "offcanvas" : variant;
+    const { state, isMobile, openMobile, setOpenMobile, mounted } = useSidebar();
     
+    if (!mounted) {
+      // SSR and initial client render: always render the desktop <aside> structure.
+      // 'state' from context is based on 'defaultOpen' and assumes isMobile=false for this phase.
+      // 'variant' should be the one passed or default, not decided by a premature 'isMobile'.
+      const ssrClientVariant = variant ?? "default"; 
+      return (
+        <aside
+          ref={ref}
+          className={cn(
+            "group/sidebar",
+            sidebarVariants({ variant: ssrClientVariant, collapsible, side, className })
+          )}
+          data-state={state} // This 'state' is ('expanded'/'collapsed') based on 'defaultOpen'
+          {...props}
+        />
+      );
+    }
+
+    // Client-side, after mount: isMobile is reliable
     if (isMobile) {
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile}>
           <SheetContent
             side={side ?? "left"}
             className={cn(
-              "m-0 flex h-full flex-col gap-0 p-0 shadow-none", // Removed shadow for cleaner look, main shadow on sidebar itself
+              "m-0 flex h-full flex-col gap-0 p-0 shadow-none",
               side === "right" ? "border-l" : "border-r",
               "w-[var(--sidebar-width-mobile)] bg-sidebar text-sidebar-foreground",
-              className
+              className // Allow overriding className
             )}
           >
-            {props.children}
+            {/* Children (SidebarHeader, SidebarContent, etc.) are passed here */}
+            {props.children} 
           </SheetContent>
         </Sheet>
       );
     }
 
+    // Client-side, desktop view after mount
+    const desktopVariant = variant ?? "default";
     return (
       <aside
         ref={ref}
         className={cn(
-          "group/sidebar", // Added group/sidebar for direct data attribute targeting
-          sidebarVariants({ variant: currentVariant, collapsible, side, className })
+          "group/sidebar",
+          sidebarVariants({ variant: desktopVariant, collapsible, side, className })
         )}
-        data-state={state} // Use derived state
+        data-state={state} // Current context state
         {...props}
       />
     );
@@ -347,8 +374,8 @@ const SidebarMenuButton = React.forwardRef<
     },
     ref
   ) => {
-    const { state: currentUiState, isMobile } = useSidebar(); // Renamed to avoid conflict with internal 'state' vars
-    const showTooltip = currentUiState === "collapsed" && !isMobile && tooltip;
+    const { state: currentUiState, isMobile, mounted } = useSidebar();
+    const showTooltip = mounted && currentUiState === "collapsed" && !isMobile && tooltip;
 
     const button = (
       <Button
@@ -361,7 +388,7 @@ const SidebarMenuButton = React.forwardRef<
           "text-sidebar-foreground/75 hover:text-sidebar-foreground",
           "hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground",
           "data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground",
-          currentUiState === "collapsed" && !isMobile && "justify-center px-0",
+          mounted && currentUiState === "collapsed" && !isMobile && "justify-center px-0",
           className
         )}
         {...props}
@@ -410,8 +437,8 @@ const SidebarSection = React.forwardRef<
     separator?: boolean;
   }
 >(({ className, label, separator = false, ...props }, ref) => {
-  const { state: currentUiState, isMobile } = useSidebar(); // Renamed to avoid conflict
-  const showLabel = currentUiState === "expanded" || isMobile;
+  const { state: currentUiState, isMobile, mounted } = useSidebar();
+  const showLabel = mounted && (currentUiState === "expanded" || isMobile);
 
   return (
     <div
@@ -435,8 +462,8 @@ const SidebarSheetClose = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof SheetClose>
 >((props, ref) => {
-  const { isMobile } = useSidebar();
-  if (!isMobile) return null;
+  const { isMobile, mounted } = useSidebar();
+  if (!mounted || !isMobile) return null;
   return <SheetClose ref={ref} {...props} />;
 });
 SidebarSheetClose.displayName = "SidebarSheetClose";
@@ -444,7 +471,7 @@ SidebarSheetClose.displayName = "SidebarSheetClose";
 
 const sidebarInsetVariants = cva("transition-[padding] duration-300 ease-in-out", {
   variants: {
-    state: { // This 'state' refers to the UI state (expanded/collapsed)
+    state: { 
       expanded: "pl-[var(--sidebar-width)]",
       collapsed: "pl-[var(--sidebar-width-icon)]",
     },
@@ -474,17 +501,18 @@ type SidebarInsetProps = React.ComponentProps<"div"> &
 
 const SidebarInset = React.forwardRef<HTMLDivElement, SidebarInsetProps>(
   ({ className, asChild, side = "left", ...props }, ref) => {
-    const { state: currentUiState, isMobile } = useSidebar(); // Renamed context state
+    const { state: currentUiState, isMobile, mounted } = useSidebar();
     const Comp = asChild ? Slot : "div";
 
-    if (isMobile) {
-      return <Comp ref={ref} className={cn("flex-1", className)} {...props} />; // Ensure flex-1 on mobile
+    if (!mounted || isMobile) { // If not mounted or if mobile, don't apply dynamic padding
+      return <Comp ref={ref} className={cn("flex-1", className)} {...props} />;
     }
 
+    // Apply dynamic padding only on desktop after mount
     return (
       <Comp
         ref={ref}
-        className={cn("flex-1", sidebarInsetVariants({ state: currentUiState, side }), className)} // Ensure flex-1
+        className={cn("flex-1", sidebarInsetVariants({ state: currentUiState, side }), className)}
         {...props}
       />
     );
@@ -497,7 +525,10 @@ const SidebarSearch = React.forwardRef<
   HTMLInputElement,
   React.ComponentProps<typeof Input>
 >(({ className, ...props }, ref) => {
-  const { state: currentUiState, isMobile } = useSidebar(); // Renamed context state
+  const { state: currentUiState, isMobile, mounted } = useSidebar();
+  if (!mounted) { // Render a placeholder or basic input for SSR/initial client if needed
+    return <Input ref={ref} className={cn("sr-only", className)} {...props} />; // Example: hide initially
+  }
   return (
     <div className="relative px-2">
       <SearchIcon className="absolute left-4 top-1/2 size-4 -translate-y-1/2 transform text-foreground/50" />
@@ -521,8 +552,8 @@ const SidebarToggle = React.forwardRef<
   HTMLButtonElement,
   Omit<ButtonProps, "size">
 >(({ className, children, ...props }, ref) => {
-  const { toggleSidebar, isMobile, state: currentUiState } = useSidebar(); // Renamed context state
-  if (isMobile) return null;
+  const { toggleSidebar, isMobile, state: currentUiState, mounted } = useSidebar(); 
+  if (!mounted || isMobile) return null; // Only show toggle on desktop after mount
 
   return (
     <Button
