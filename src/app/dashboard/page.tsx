@@ -5,12 +5,11 @@ import { useState } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+// Label import removed as it's no longer used in this file
 import { Flame, BookOpen, Mic, Edit3, Headphones, Activity, Award, CalendarDays, Users, SlidersHorizontal, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { LanguageSelector } from "@/components/shared/LanguageSelector";
-import { ModeSelector } from "@/components/shared/ModeSelector";
+// LanguageSelector and ModeSelector imports removed as they are no longer used directly in this file
 import type { Language, LearningMode } from "@/lib/types";
 import { SUPPORTED_LANGUAGES, LEARNING_MODES, DEFAULT_LANGUAGE, DEFAULT_MODE } from "@/lib/constants";
 
@@ -109,45 +108,9 @@ export default function DashboardPage() {
             ))}
           </div>
         </section>
-
-        <section>
-          <h2 className="text-2xl font-headline font-semibold text-foreground mb-4">Learning Preferences</h2>
-          <Card className="shadow-lg bg-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl font-headline">
-                <SlidersHorizontal className="h-6 w-6 text-primary"/>
-                Adjust Your Focus
-              </CardTitle>
-              <CardDescription>Select the language and learning style you want to focus on.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="language-select-dashboard" className="text-sm font-medium">Target Language</Label>
-                <LanguageSelector
-                  selectedLanguage={currentLanguage}
-                  onLanguageChange={handleLanguageChange}
-                  className="w-full"
-                  // id="language-select-dashboard" // The button inside will have its own aria-label
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mode-select-dashboard" className="text-sm font-medium">Learning Mode</Label>
-                <ModeSelector
-                  selectedMode={currentMode}
-                  onModeChange={handleModeChange}
-                  className="w-full"
-                  // id="mode-select-dashboard" // The button inside will have its own aria-label
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
-                Save Preferences
-              </Button>
-            </CardFooter>
-          </Card>
-        </section>
         
+        {/* Learning Preferences section removed */}
+
         <section>
           <h2 className="text-2xl font-headline font-semibold text-foreground mb-4">Your Learning Path</h2>
           <Card className="shadow-lg bg-card">
@@ -228,5 +191,3 @@ export default function DashboardPage() {
     </AuthenticatedLayout>
   );
 }
-
-    
