@@ -101,6 +101,9 @@ export default function HomePage() {
             {/* <Button variant="ghost" asChild>
               <Link href="#languages">Languages</Link>
             </Button> */}
+            <Button variant="outline" asChild className="px-4 sm:px-6">
+              <Link href="/login">Log In</Link>
+            </Button>
             <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 sm:px-6">
               <Link href="/signup">Get Started</Link>
             </Button>
