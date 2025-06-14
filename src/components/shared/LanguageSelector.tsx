@@ -3,7 +3,6 @@
 
 import * as React from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
-
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
 import { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
 import type { Language } from "@/lib/types";
 
@@ -48,7 +48,7 @@ export function LanguageSelector({ selectedLanguage, onLanguageChange, className
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0 z-[60]">
+      <PopoverContent className="w-[200px] p-0 z-[100]">
         <Command>
           <CommandInput placeholder="Search language..." />
           <CommandList>
