@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Volume2, CheckSquare, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare, ChevronLeft, AlertCircle, CheckCircle } from "lucide-react";
+import { Volume2, CheckSquare, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare, ChevronLeft, AlertCircle, CheckCircle, Brain } from "lucide-react";
 import Link from "next/link";
 import Image from 'next/image';
 import { useLearning } from '@/context/LearningContext';
@@ -13,6 +13,10 @@ import type { DailyWordItem } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from '@/lib/utils';
+import { generateMiniStory, MiniStoryInput } from '@/ai/flows/mini-story-flow';
+import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 
 // Function to get placeholder words based on language and mode
 const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWordItem[] => {
@@ -70,13 +74,15 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
     ];
     return applyTravelAdjustments(ukrainianWords, 'ua');
   }
-  return [
+  // Default English words if no match
+    const englishWords: DailyWordItem[] = [
     { wordBankId: "en1", word: "Apple", translation: "Manzana (Spanish)", ...commonProps, exampleSentence: "I eat an apple.", wordType: "noun", dataAiHint: "apple fruit" },
     { wordBankId: "en2", word: "To eat", translation: "Comer (Spanish)", ...commonProps, exampleSentence: "I like to eat fruits.", wordType: "verb", dataAiHint: "person eating" },
     { wordBankId: "en3", word: "Red", translation: "Rojo (Spanish)", ...commonProps, exampleSentence: "The apple is red.", wordType: "adjective", dataAiHint: "red color swatch" },
     { wordBankId: "en4", word: "I want", translation: "Quiero (Spanish)", ...commonProps, exampleSentence: "I want to learn.", wordType: "phrase", dataAiHint: "person thinking" },
     { wordBankId: "en5", word: "Water", translation: "Agua (Spanish)", ...commonProps, exampleSentence: "I drink water.", wordType: "noun", dataAiHint: "glass water" },
   ];
+  return applyTravelAdjustments(englishWords, selectedLanguage.code as 'es' | 'fr' | 'ua'); // Apply travel to default if applicable
 };
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -90,6 +96,7 @@ function shuffleArray<T>(array: T[]): T[] {
 
 export default function DailySessionPage() {
   const { selectedLanguage, selectedMode, isLoadingPreferences } = useLearning();
+  const { toast } = useToast();
   const [dailyWords, setDailyWords] = useState<DailyWordItem[]>([]);
   const [isLoadingLesson, setIsLoadingLesson] = useState(true);
 
@@ -102,16 +109,27 @@ export default function DailySessionPage() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [recognitionFeedback, setRecognitionFeedback] = useState<{ message: string; correct: boolean } | null>(null);
   
+  // Story Stage
+  const [miniStoryText, setMiniStoryText] = useState<string | null>(null);
+  const [isLoadingStory, setIsLoadingStory] = useState<boolean>(false);
+  
   const [practiceStage, setPracticeStage] = useState<'introduction' | 'recognition' | 'story' | 'chat'>('introduction');
 
   useEffect(() => {
     if (!isLoadingPreferences && selectedLanguage && selectedMode) { 
       setIsLoadingLesson(true);
-      setTimeout(() => {
+      setTimeout(() => { // Simulate async fetch
         const relevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
         setDailyWords(relevantWords.slice(0, 5)); 
         setCurrentIntroWordIndex(0);
         setPracticeStage('introduction');
+        // Reset other stage-specific states
+        setRecognitionQuestion(null);
+        setSelectedOption(null);
+        setRecognitionFeedback(null);
+        setCurrentRecognitionIndex(0);
+        setMiniStoryText(null);
+        setIsLoadingStory(false);
         setIsLoadingLesson(false);
       }, 500); 
     }
@@ -129,7 +147,7 @@ export default function DailySessionPage() {
       setCurrentIntroWordIndex(prev => prev + 1);
     } else {
       setPracticeStage('recognition'); 
-      setupRecognitionQuestion(0); // Initialize first recognition question
+      setupRecognitionQuestion(0);
     }
   };
 
@@ -139,10 +157,12 @@ export default function DailySessionPage() {
     }
   };
 
-  // Recognition Stage Logic
   const setupRecognitionQuestion = useCallback((index: number) => {
     if (index >= dailyWords.length || dailyWords.length === 0) {
-      setPracticeStage('story'); // Should not happen if called correctly
+      // This case should ideally be handled by handleNextRecognitionItem logic
+      // to transition to story stage. If it's reached, it's likely an error or empty dailyWords.
+      setPracticeStage('story'); 
+      fetchMiniStory(); // Attempt to fetch story if words are empty but moving to story stage
       return;
     }
     const wordItem = dailyWords[index];
@@ -152,28 +172,32 @@ export default function DailySessionPage() {
       .filter((_, i) => i !== index)
       .map(dw => dw.translation);
     
-    // Ensure enough unique distractors, add generic ones if needed
     const neededDistractors = 2;
-    const genericDistractors = ["Other Option 1", "Other Option 2", "Another Choice", "Different Answer"];
+    const genericDistractors = ["Other Option 1", "Another Choice", "Different Answer", "Not this one"];
     let currentDistractorIdx = 0;
     while (distractors.length < neededDistractors && currentDistractorIdx < genericDistractors.length) {
-        if (!distractors.includes(genericDistractors[currentDistractorIdx]) && correctAnswer !== genericDistractors[currentDistractorIdx]) {
-            distractors.push(genericDistractors[currentDistractorIdx]);
+        const distractorCandidate = genericDistractors[currentDistractorIdx];
+        if (!distractors.includes(distractorCandidate) && correctAnswer !== distractorCandidate) {
+            distractors.push(distractorCandidate);
         }
         currentDistractorIdx++;
     }
+    // Ensure we have enough distractors, even if they are repeated generic ones (less ideal but handles small dailyWords list)
+    while(distractors.length < neededDistractors) {
+        distractors.push(`Placeholder ${distractors.length + 1}`);
+    }
+    
     distractors = shuffleArray(distractors).slice(0, neededDistractors);
-
     const options = shuffleArray([correctAnswer, ...distractors]);
     
     setRecognitionQuestion({ word: wordItem.word, translation: correctAnswer, options });
     setSelectedOption(null);
     setRecognitionFeedback(null);
     setCurrentRecognitionIndex(index);
-  }, [dailyWords]);
+  }, [dailyWords]); // Removed fetchMiniStory from here, it will be called on transition
 
   const handleOptionSelect = (option: string) => {
-    if (recognitionFeedback) return; // Don't allow changing answer after feedback
+    if (recognitionFeedback) return;
     setSelectedOption(option);
   };
 
@@ -190,9 +214,40 @@ export default function DailySessionPage() {
     if (currentRecognitionIndex < dailyWords.length - 1) {
       setupRecognitionQuestion(currentRecognitionIndex + 1);
     } else {
-      setPracticeStage('story'); 
+      setPracticeStage('story');
+      fetchMiniStory(); // Fetch story when transitioning to story stage
     }
   };
+  
+  const fetchMiniStory = async () => {
+    if (dailyWords.length === 0) {
+        setMiniStoryText("No words available to create a story. Try starting a new lesson!");
+        setIsLoadingStory(false);
+        return;
+    }
+    setIsLoadingStory(true);
+    setMiniStoryText(null);
+    try {
+      const input: MiniStoryInput = {
+        targetLanguage: selectedLanguage.name, // Use name for AI prompt clarity
+        learningMode: selectedMode.name, // Use name for AI prompt clarity
+        dailyWords: dailyWords.map(w => w.word),
+      };
+      const result = await generateMiniStory(input);
+      setMiniStoryText(result.storyText);
+    } catch (error) {
+      console.error("Error generating mini story:", error);
+      toast({
+        title: "Story Generation Failed",
+        description: "Could not create a mini-story. Using a default message.",
+        variant: "destructive",
+      });
+      setMiniStoryText(`Apologies, I couldn't create a story with ${selectedLanguage.name} words for the ${selectedMode.name} mode right now. Please try to use your new words in the chat!`);
+    } finally {
+      setIsLoadingStory(false);
+    }
+  };
+
 
   if (isLoadingPreferences || isLoadingLesson) {
     return (
@@ -208,12 +263,13 @@ export default function DailySessionPage() {
   if (dailyWords.length === 0 && !isLoadingLesson) { 
      return (
       <AuthenticatedLayout>
-        <Alert>
-          <Lightbulb className="h-4 w-4" />
-          <AlertTitle>No words for today!</AlertTitle>
-          <AlertDescription>
+        <Alert variant="default" className="border-primary bg-primary/10">
+          <Lightbulb className="h-5 w-5 text-primary" />
+          <AlertTitle className="text-primary">No words for today!</AlertTitle>
+          <AlertDescription className="text-primary/80">
             It seems there are no new words for you in {selectedLanguage.name} ({selectedMode.name} mode).
-            <Link href="/profile"><Button variant="link" className="p-0 h-auto ml-1">Go to Profile</Button></Link>
+            Why not <Link href="/vocabulary"><Button variant="link" className="p-0 h-auto ml-1 text-primary hover:underline">review your vocabulary</Button></Link> or 
+            <Link href="/profile"><Button variant="link" className="p-0 h-auto ml-1 text-primary hover:underline">check your profile settings?</Button></Link>
           </AlertDescription>
         </Alert>
       </AuthenticatedLayout>
@@ -231,7 +287,8 @@ export default function DailySessionPage() {
             Mode: {selectedMode.name} - Let's learn some new words!
           </p>
            {practiceStage === 'introduction' && dailyWords.length > 0 && <Progress value={introProgressPercentage} className="mt-2 h-2" />}
-           {practiceStage === 'recognition' && dailyWords.length > 0 && <Progress value={(currentRecognitionIndex / dailyWords.length) * 100} className="mt-2 h-2" />}
+           {practiceStage === 'recognition' && dailyWords.length > 0 && <Progress value={( (currentRecognitionIndex + (recognitionFeedback ? 1:0) ) / dailyWords.length) * 100} className="mt-2 h-2" />}
+           {practiceStage === 'story' && <Progress value={100} className="mt-2 h-2" />}
         </section>
 
         {/* Introduction Stage */}
@@ -282,7 +339,7 @@ export default function DailySessionPage() {
         {practiceStage === 'recognition' && recognitionQuestion && (
           <Card className="shadow-lg bg-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><CheckSquare className="h-6 w-6 text-primary"/>Recognition Practice</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Brain className="h-6 w-6 text-primary"/>Recognition Practice</CardTitle>
               <CardDescription>Question {currentRecognitionIndex + 1} of {dailyWords.length}: Match the word to its translation.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -297,8 +354,8 @@ export default function DailySessionPage() {
                     className={cn(
                       "w-full text-base py-6 h-auto justify-center",
                       selectedOption === option && "ring-2 ring-primary-foreground ring-offset-2",
-                      recognitionFeedback && option === recognitionQuestion.translation && "bg-green-500/20 border-green-500 hover:bg-green-500/30",
-                      recognitionFeedback && selectedOption === option && option !== recognitionQuestion.translation && "bg-red-500/20 border-red-500 hover:bg-red-500/30"
+                      recognitionFeedback && option === recognitionQuestion.translation && "bg-green-500/20 border-green-500 hover:bg-green-500/30 text-green-700",
+                      recognitionFeedback && selectedOption === option && option !== recognitionQuestion.translation && "bg-red-500/20 border-red-500 hover:bg-red-500/30 text-red-700"
                     )}
                     onClick={() => handleOptionSelect(option)}
                     disabled={!!recognitionFeedback}
@@ -334,22 +391,40 @@ export default function DailySessionPage() {
           </Card>
         )}
 
-        {/* Mini-Story Context Stage (Placeholder) */}
+        {/* Mini-Story Context Stage */}
         {practiceStage === 'story' && (
           <Card className="shadow-lg bg-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><BookOpen className="h-6 w-6 text-primary"/>Mini-Story Context</CardTitle>
-              <CardDescription>See today's words in a short story.</CardDescription>
+              <CardDescription>See today's words in a short story, in {selectedLanguage.name}.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground leading-relaxed p-4 bg-secondary/30 rounded-md">
-                (A short story using words like <strong>{dailyWords[0]?.word}</strong>, <strong>{dailyWords[1]?.word}</strong>, and <strong>{dailyWords[2]?.word}</strong> will appear here. It will incorporate previously learned vocabulary too!)
-              </p>
-              <p className="text-sm text-center text-muted-foreground">Read the story and try to understand the new words in context.</p>
-              <Button onClick={() => setPracticeStage('chat')} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                Practice with AI Tutor <MessageSquare className="ml-2 h-5 w-5" />
-              </Button>
+            <CardContent className="space-y-4 min-h-[200px] flex flex-col justify-center">
+              {isLoadingStory && (
+                <div className="flex flex-col items-center justify-center text-muted-foreground">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3"></div>
+                  <p>Generating your mini-story...</p>
+                </div>
+              )}
+              {!isLoadingStory && miniStoryText && (
+                <ScrollArea className="h-48 p-4 bg-secondary/30 rounded-md border">
+                    <p className="text-foreground leading-relaxed whitespace-pre-wrap">{miniStoryText}</p>
+                </ScrollArea>
+              )}
+              {!isLoadingStory && !miniStoryText && (
+                 <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Story Unavailable</AlertTitle>
+                    <AlertDescription>
+                      We couldn't generate a story right now. You can proceed to chat practice.
+                    </AlertDescription>
+                  </Alert>
+              )}
             </CardContent>
+            <CardFooter>
+              <Button onClick={() => setPracticeStage('chat')} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoadingStory}>
+                {isLoadingStory ? "Loading Story..." : <>Practice with AI Tutor <MessageSquare className="ml-2 h-5 w-5" /></>}
+              </Button>
+            </CardFooter>
           </Card>
         )}
         
@@ -374,5 +449,3 @@ export default function DailySessionPage() {
     </AuthenticatedLayout>
   );
 }
-
-    
