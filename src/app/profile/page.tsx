@@ -11,8 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Edit, Award, BarChart3, CalendarCheck2, Target, LanguagesIcon, User, Save, Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { Progress } from "@/components/ui/progress";
-import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -49,7 +47,7 @@ const initialProfileValues: ProfileData = {
   photoURL: 'https://placehold.co/200x200.png',
   joinDate: new Date().toISOString(),
   nativeLanguageCode: DEFAULT_LANGUAGE.code,
-  targetLanguageCode: SUPPORTED_LANGUAGES.length > 1 ? SUPPORTED_LANGUAGES[1].code : DEFAULT_LANGUAGE.code, // Default to a different target lang if available
+  targetLanguageCode: SUPPORTED_LANGUAGES.find(l => l.code !== DEFAULT_LANGUAGE.code)?.code || DEFAULT_LANGUAGE.code,
   currentLearningModeId: DEFAULT_MODE.id,
 };
 
@@ -63,108 +61,90 @@ const placeholderStats = {
 
 
 export default function ProfilePage() {
-  const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<ProfileData>(initialProfileValues);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true); // For profile page data loading
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   
-  // Using context for current session's language/mode, but profile page manages persisted preferences.
   const { 
-    selectedLanguage: contextSessionLanguage, 
-    selectedMode: contextSessionMode, 
-    setSelectedLanguage: setContextSessionLanguage, 
-    setSelectedMode: setContextSessionMode 
+    selectedLanguage: contextTargetLanguage, 
+    selectedMode: contextLearningMode, 
+    setLanguage: setContextAndPersistLanguage, 
+    setMode: setContextAndPersistMode,
+    isLoadingPreferences: isLoadingContextPrefs,
+    authUser
   } = useLearning();
 
-  // Local state for editing language/mode preferences on this page
-  const [editableTargetLanguage, setEditableTargetLanguage] = useState<Language>(DEFAULT_LANGUAGE);
+  // Local state for UI elements, initialized from context or fetched data
+  // These will be updated from Firestore initially, then user can change them.
+  const [editableTargetLanguage, setEditableTargetLanguage] = useState<Language>(contextTargetLanguage);
   const [editableNativeLanguage, setEditableNativeLanguage] = useState<Language>(DEFAULT_LANGUAGE);
-  const [editableLearningMode, setEditableLearningMode] = useState<LearningMode>(DEFAULT_MODE);
-
+  const [editableLearningMode, setEditableLearningMode] = useState<LearningMode>(contextLearningMode);
 
   const db = getFirestore(app);
-  const auth = getAuth(app);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setAuthUser(user);
-        const userDocRef = doc(db, "users", user.uid);
+    if (authUser) {
+      setIsLoadingProfile(true);
+      const userDocRef = doc(db, "users", authUser.uid);
+      const fetchProfile = async () => {
         try {
           const docSnap = await getDoc(userDocRef);
           if (docSnap.exists()) {
             const firestoreData = docSnap.data() as ProfileData;
             setProfile(firestoreData);
-            // Sync editable preferences state with fetched profile data
-            const fetchedTargetLang = SUPPORTED_LANGUAGES.find(l => l.code === firestoreData.targetLanguageCode) || DEFAULT_LANGUAGE;
-            const fetchedNativeLang = SUPPORTED_LANGUAGES.find(l => l.code === firestoreData.nativeLanguageCode) || DEFAULT_LANGUAGE;
-            const fetchedMode = LEARNING_MODES.find(m => m.id === firestoreData.currentLearningModeId) || DEFAULT_MODE;
             
-            setEditableTargetLanguage(fetchedTargetLang);
-            setEditableNativeLanguage(fetchedNativeLang);
-            setEditableLearningMode(fetchedMode);
-
-            // Update context if it's different from persisted, user might have changed it in header
-            // Or, context should primarily reflect persisted data upon app load.
-            // For now, ensure context reflects loaded profile.
-            setContextSessionLanguage(fetchedTargetLang); 
-            setContextSessionMode(fetchedMode);
-
+            // Initialize editable states from fetched profile data
+            setEditableTargetLanguage(SUPPORTED_LANGUAGES.find(l => l.code === firestoreData.targetLanguageCode) || contextTargetLanguage);
+            setEditableNativeLanguage(SUPPORTED_LANGUAGES.find(l => l.code === firestoreData.nativeLanguageCode) || DEFAULT_LANGUAGE);
+            setEditableLearningMode(LEARNING_MODES.find(m => m.id === firestoreData.currentLearningModeId) || contextLearningMode);
           } else {
-            // Initialize profile for new user, using context as a fallback or defaults
-            const initialData: ProfileData = {
-              uid: user.uid,
-              displayName: user.displayName || '',
-              username: user.email?.split('@')[0] || `user_${user.uid.substring(0,5)}`,
-              email: user.email || '',
-              photoURL: user.photoURL || 'https://placehold.co/200x200.png',
-              joinDate: user.metadata.creationTime || new Date().toISOString(),
-              nativeLanguageCode: contextSessionLanguage.code, // Or a default
-              targetLanguageCode: contextSessionLanguage.code, // Or a default, ensure different from native
-              currentLearningModeId: contextSessionMode.id,   // Or a default
+            // Profile doesn't exist, initialize with authUser data and context/defaults
+            const newProfile: ProfileData = {
+              uid: authUser.uid,
+              displayName: authUser.displayName || '',
+              username: authUser.email?.split('@')[0] || `user_${authUser.uid.substring(0,5)}`,
+              email: authUser.email || '',
+              photoURL: authUser.photoURL || 'https://placehold.co/200x200.png',
+              joinDate: authUser.metadata.creationTime || new Date().toISOString(),
+              nativeLanguageCode: DEFAULT_LANGUAGE.code, // Default native
+              targetLanguageCode: contextTargetLanguage.code, // From context
+              currentLearningModeId: contextLearningMode.id,   // From context
             };
-             // Adjust target if same as native
-            if (initialData.targetLanguageCode === initialData.nativeLanguageCode) {
-                const alternativeTarget = SUPPORTED_LANGUAGES.find(l => l.code !== initialData.nativeLanguageCode) || SUPPORTED_LANGUAGES[0];
-                initialData.targetLanguageCode = alternativeTarget.code;
+            if (newProfile.targetLanguageCode === newProfile.nativeLanguageCode) {
+                const alternativeTarget = SUPPORTED_LANGUAGES.find(l => l.code !== newProfile.nativeLanguageCode) || SUPPORTED_LANGUAGES[0];
+                newProfile.targetLanguageCode = alternativeTarget.code;
             }
-
-            setProfile(initialData);
-            setEditableTargetLanguage(SUPPORTED_LANGUAGES.find(l => l.code === initialData.targetLanguageCode) || DEFAULT_LANGUAGE);
-            setEditableNativeLanguage(SUPPORTED_LANGUAGES.find(l => l.code === initialData.nativeLanguageCode) || DEFAULT_LANGUAGE);
-            setEditableLearningMode(LEARNING_MODES.find(m => m.id === initialData.currentLearningModeId) || DEFAULT_MODE);
-            
-            await setDoc(userDocRef, initialData);
+            setProfile(newProfile);
+            setEditableTargetLanguage(SUPPORTED_LANGUAGES.find(l => l.code === newProfile.targetLanguageCode) || contextTargetLanguage);
+            setEditableNativeLanguage(SUPPORTED_LANGUAGES.find(l => l.code === newProfile.nativeLanguageCode) || DEFAULT_LANGUAGE);
+            setEditableLearningMode(LEARNING_MODES.find(m => m.id === newProfile.currentLearningModeId) || contextLearningMode);
+            // Save this initial profile silently or prompt user
+            await setDoc(userDocRef, newProfile, { merge: true });
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
           toast({ title: "Error", description: "Could not load profile data.", variant: "destructive" });
-            const fallbackData: ProfileData = {
-              uid: user.uid,
-              displayName: user.displayName || '',
-              username: user.email?.split('@')[0] || `user_${user.uid.substring(0,5)}`,
-              email: user.email || '',
-              photoURL: user.photoURL || 'https://placehold.co/200x200.png',
-              joinDate: user.metadata.creationTime || new Date().toISOString(),
-              nativeLanguageCode: DEFAULT_LANGUAGE.code,
-              targetLanguageCode: SUPPORTED_LANGUAGES.length > 1 ? SUPPORTED_LANGUAGES[1].code : DEFAULT_LANGUAGE.code,
-              currentLearningModeId: DEFAULT_MODE.id,
-            };
-            setProfile(fallbackData);
-            setEditableNativeLanguage(SUPPORTED_LANGUAGES.find(l => l.code === fallbackData.nativeLanguageCode) || DEFAULT_LANGUAGE);
-            setEditableTargetLanguage(SUPPORTED_LANGUAGES.find(l => l.code === fallbackData.targetLanguageCode) || DEFAULT_LANGUAGE);
-            setEditableLearningMode(LEARNING_MODES.find(m => m.id === fallbackData.currentLearningModeId) || DEFAULT_MODE);
+          // Fallback to initial/context values if fetch fails
+            setProfile(prev => ({
+                ...prev,
+                uid: authUser.uid,
+                email: authUser.email || '',
+                displayName: authUser.displayName || prev.displayName || '',
+                photoURL: authUser.photoURL || prev.photoURL,
+                joinDate: authUser.metadata.creationTime || prev.joinDate,
+            }));
+            setEditableTargetLanguage(contextTargetLanguage);
+            setEditableLearningMode(contextLearningMode);
+        } finally {
+          setIsLoadingProfile(false);
         }
-      } else {
-        setAuthUser(null);
-        setProfile(initialProfileValues); 
-        // router.push('/login'); // Or handle unauthenticated state
-      }
-      setIsLoading(false);
-    });
-    return () => unsubscribe();
-  }, [auth, db, toast, setContextSessionLanguage, setContextSessionMode]); // Removed context deps that might cause loops if not careful
+      };
+      fetchProfile();
+    } else if (!isLoadingContextPrefs) { // If context is done loading and there's no authUser
+      setIsLoadingProfile(false); // Nothing to load for profile page
+    }
+  }, [authUser, db, toast, contextTargetLanguage, contextLearningMode, isLoadingContextPrefs]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -176,24 +156,31 @@ export default function ProfilePage() {
       toast({ title: "Error", description: "You must be logged in to save changes.", variant: "destructive" });
       return;
     }
+    if (editableNativeLanguage.code === editableTargetLanguage.code) {
+      toast({ title: "Selection Error", description: "Native and target languages must be different.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     const userDocRef = doc(db, "users", authUser.uid);
     
     const dataToSave: ProfileData = {
-      ...profile,
-      joinDate: profile.joinDate || new Date().toISOString(),
+      ...profile, // Contains displayName, username, photoURL, email, uid from state
+      joinDate: profile.joinDate || new Date().toISOString(), // Ensure joinDate
       nativeLanguageCode: editableNativeLanguage.code,
-      targetLanguageCode: editableTargetLanguage.code,
+      // targetLanguageCode and currentLearningModeId will be persisted by context setters
+      targetLanguageCode: editableTargetLanguage.code, 
       currentLearningModeId: editableLearningMode.id,
     };
 
     try {
+      // Save the full profile data including native language and other text fields
       await setDoc(userDocRef, dataToSave, { merge: true });
-      setProfile(dataToSave); // Update local state with potentially updated joinDate, language, mode
-      // Update learning context to reflect saved preferences
-      setContextSessionLanguage(editableTargetLanguage);
-      setContextSessionMode(editableLearningMode);
-      // Native language isn't directly in learning context, but good to keep it updated if a global native lang setting is needed
+      setProfile(dataToSave); // Update local profile state
+      
+      // Update learning context which also persists targetLanguage and mode
+      await setContextAndPersistLanguage(editableTargetLanguage);
+      await setContextAndPersistMode(editableLearningMode);
+      
       toast({ title: "Success", description: "Profile updated successfully!" });
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -203,11 +190,26 @@ export default function ProfilePage() {
     }
   };
 
-  if (isLoading) {
+  // Show loading indicator if either context preferences or profile page data is loading
+  if (isLoadingContextPrefs || isLoadingProfile) {
     return (
       <AuthenticatedLayout>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+           <p className="ml-3 text-muted-foreground">Loading profile...</p>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+  
+  if (!authUser && !isLoadingContextPrefs && !isLoadingProfile) {
+     return (
+      <AuthenticatedLayout>
+        <div className="text-center py-10">
+          <p className="text-lg text-muted-foreground">Please log in to view your profile.</p>
+          <Button asChild className="mt-4">
+            <Link href="/login">Log In</Link>
+          </Button>
         </div>
       </AuthenticatedLayout>
     );
@@ -246,16 +248,16 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="displayName">Display Name</Label>
-                <Input id="displayName" name="displayName" value={profile.displayName} onChange={handleInputChange} placeholder="Your display name" />
+                <Input id="displayName" name="displayName" value={profile.displayName} onChange={handleInputChange} placeholder="Your display name" disabled={isSaving}/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
-                <Input id="username" name="username" value={profile.username} onChange={handleInputChange} placeholder="Your username" />
+                <Input id="username" name="username" value={profile.username} onChange={handleInputChange} placeholder="Your username" disabled={isSaving}/>
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="photoURL">Avatar URL</Label>
-              <Input id="photoURL" name="photoURL" type="url" value={profile.photoURL} onChange={handleInputChange} placeholder="https://example.com/avatar.png" />
+              <Input id="photoURL" name="photoURL" type="url" value={profile.photoURL} onChange={handleInputChange} placeholder="https://example.com/avatar.png" disabled={isSaving}/>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -274,26 +276,32 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="nativeLanguage">Native Language</Label>
-                <LanguageSelector selectedLanguage={editableNativeLanguage} onLanguageChange={setEditableNativeLanguage} className="w-full" />
+                <LanguageSelector selectedLanguage={editableNativeLanguage} onLanguageChange={setEditableNativeLanguage} className="w-full" disabled={isSaving}/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="targetLanguage">Target Language</Label>
-                <LanguageSelector selectedLanguage={editableTargetLanguage} onLanguageChange={setEditableTargetLanguage} className="w-full" />
+                <LanguageSelector selectedLanguage={editableTargetLanguage} onLanguageChange={setEditableTargetLanguage} className="w-full" disabled={isSaving}/>
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="learningMode">Default Learning Mode</Label>
-              <ModeSelector selectedMode={editableLearningMode} onModeChange={setEditableLearningMode} className="w-full" />
+              <ModeSelector selectedMode={editableLearningMode} onModeChange={setEditableLearningMode} className="w-full" disabled={isSaving}/>
             </div>
+             {editableNativeLanguage.code === editableTargetLanguage.code && (
+                <p className="text-sm text-center text-destructive">Native and target languages must be different.</p>
+            )}
           </CardContent>
         </Card>
         
         <div className="flex justify-end">
-            <Button onClick={handleSaveChanges} disabled={isSaving || isLoading} className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[150px]">
+            <Button 
+              onClick={handleSaveChanges} 
+              disabled={isSaving || isLoadingProfile || isLoadingContextPrefs || editableNativeLanguage.code === editableTargetLanguage.code} 
+              className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[150px]"
+            >
               {isSaving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save All Changes</>}
             </Button>
         </div>
-
 
         <section>
           <h2 className="text-2xl font-headline font-semibold text-foreground mb-4">Learning Statistics</h2>
@@ -313,8 +321,8 @@ export default function ProfilePage() {
              <Card className="shadow-lg bg-card">
               <CardHeader><CardTitle className="text-lg text-primary">Current Focus</CardTitle></CardHeader>
               <CardContent>
-                <p className="text-md font-semibold">{SUPPORTED_LANGUAGES.find(l => l.code === profile.targetLanguageCode)?.name || profile.targetLanguageCode}</p>
-                <p className="text-sm text-muted-foreground">{LEARNING_MODES.find(m => m.id === profile.currentLearningModeId)?.name || profile.currentLearningModeId} Mode</p>
+                <p className="text-md font-semibold">{contextTargetLanguage.name}</p>
+                <p className="text-sm text-muted-foreground">{contextLearningMode.name} Mode</p>
               </CardContent>
             </Card>
           </div>
@@ -351,7 +359,7 @@ export default function ProfilePage() {
             <Card className="shadow-lg bg-card">
                 <CardContent className="p-6 space-y-4">
                     {[
-                        {icon: <LanguagesIcon className="h-5 w-5 text-green-500"/>, text: `Started learning ${SUPPORTED_LANGUAGES.find(l=>l.code === profile.targetLanguageCode)?.name || 'a language'}`, time: "2 days ago"},
+                        {icon: <LanguagesIcon className="h-5 w-5 text-green-500"/>, text: `Started learning ${contextTargetLanguage.name}`, time: "2 days ago"},
                         {icon: <Target className="h-5 w-5 text-blue-500"/>, text: "Completed 'Basic Greetings' vocabulary set", time: "1 day ago"},
                         {icon: <CalendarCheck2 className="h-5 w-5 text-purple-500"/>, text: `Achieved a ${placeholderStats.currentStreak}-day learning streak!`, time: "Today"},
                     ].map((activity, index) => (

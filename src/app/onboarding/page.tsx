@@ -12,18 +12,18 @@ import { SUPPORTED_LANGUAGES, LEARNING_MODES, DEFAULT_LANGUAGE, DEFAULT_MODE, AP
 import type { Language, LearningMode } from '@/lib/types';
 import { useLearning } from '@/context/LearningContext';
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import type { ProfileData } from '@/app/profile/page'; // Assuming ProfileData is exported
+import type { ProfileData } from '@/app/profile/page';
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { setSelectedLanguage: setContextTargetLanguage, setSelectedMode: setContextLearningMode } = useLearning();
+  // useLearning now provides authUser, setLanguage and setMode which persist
+  const { authUser: contextAuthUser, setLanguage: setContextTargetLanguage, setMode: setContextLearningMode } = useLearning();
 
-  const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // For initial auth check
 
   const [nativeLanguage, setNativeLanguage] = useState<Language>(DEFAULT_LANGUAGE);
   const [targetLanguage, setTargetLanguage] = useState<Language>(
@@ -32,22 +32,28 @@ export default function OnboardingPage() {
   const [learningMode, setLearningMode] = useState<LearningMode>(DEFAULT_MODE);
   const [isSaving, setIsSaving] = useState(false);
 
-  const auth = getAuth(app);
+  const auth = getAuth(app); // Still need auth for direct use if contextAuthUser is not yet populated
   const db = getFirestore(app);
 
   useEffect(() => {
+    // This effect primarily checks if the user should be on this page
+    // Context's onAuthStateChanged will handle authUser state for persistence
+    if (contextAuthUser === null && !isLoadingAuth) { // If context determined no user and auth check done
+        router.push('/login');
+    } else if (contextAuthUser !== null) {
+        setIsLoadingAuth(false); // User is available via context
+    }
+    // Fallback if context is slower to update authUser, direct check:
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setAuthUser(user);
-      } else {
-        router.push('/login'); // Redirect if not authenticated
-      }
-      setIsLoadingAuth(false);
+        if (!user) {
+            router.push('/login');
+        }
+        setIsLoadingAuth(false); // Direct auth check complete
     });
     return () => unsubscribe();
-  }, [auth, router]);
 
-  // Ensure target language is different from native language
+  }, [auth, router, contextAuthUser, isLoadingAuth]);
+
   useEffect(() => {
     if (nativeLanguage.code === targetLanguage.code) {
       const newTarget = SUPPORTED_LANGUAGES.find(lang => lang.code !== nativeLanguage.code) || SUPPORTED_LANGUAGES[0];
@@ -57,7 +63,8 @@ export default function OnboardingPage() {
 
 
   const handleSavePreferences = async () => {
-    if (!authUser) {
+    const currentUser = contextAuthUser || auth.currentUser; // Prefer context's authUser
+    if (!currentUser) {
       toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
@@ -67,29 +74,30 @@ export default function OnboardingPage() {
     }
 
     setIsSaving(true);
-    const userDocRef = doc(db, "users", authUser.uid);
+    const userDocRef = doc(db, "users", currentUser.uid);
 
     const preferencesToSave: Partial<ProfileData> = {
       nativeLanguageCode: nativeLanguage.code,
-      targetLanguageCode: targetLanguage.code,
-      currentLearningModeId: learningMode.id,
-      // Ensure other essential fields like uid, email, displayName, joinDate are preserved or set if new
-      uid: authUser.uid,
-      email: authUser.email || '',
-      displayName: authUser.displayName || authUser.email?.split('@')[0] || `User ${authUser.uid.substring(0,5)}`,
-      photoURL: authUser.photoURL || 'https://placehold.co/200x200.png',
-      joinDate: authUser.metadata.creationTime || new Date().toISOString(), // Set joinDate if not already present
+      targetLanguageCode: targetLanguage.code, // This will be persisted by setContextTargetLanguage
+      currentLearningModeId: learningMode.id, // This will be persisted by setContextLearningMode
+      // Ensure other essential fields are preserved or set if new
+      uid: currentUser.uid,
+      email: currentUser.email || '',
+      displayName: currentUser.displayName || currentUser.email?.split('@')[0] || `User ${currentUser.uid.substring(0,5)}`,
+      photoURL: currentUser.photoURL || 'https://placehold.co/200x200.png',
+      joinDate: currentUser.metadata.creationTime || new Date().toISOString(),
     };
 
     try {
-      await setDoc(userDocRef, preferencesToSave, { merge: true }); // Merge to not overwrite existing profile fields
+      // Save the full profile data including native language
+      await setDoc(userDocRef, preferencesToSave, { merge: true }); 
       
-      // Update context
-      setContextTargetLanguage(targetLanguage);
-      setContextLearningMode(learningMode);
+      // Update context for target language and mode (this also saves them)
+      await setContextTargetLanguage(targetLanguage);
+      await setContextLearningMode(learningMode);
 
       toast({ title: "Preferences Saved!", description: "Welcome! Let's start your learning journey." });
-      router.push('/daily-session'); // Navigate to the daily session page
+      router.push('/daily-session');
     } catch (error) {
       console.error("Error saving preferences:", error);
       toast({ title: "Save Error", description: "Could not save your preferences. Please try again.", variant: "destructive" });
@@ -98,7 +106,7 @@ export default function OnboardingPage() {
     }
   };
 
-  if (isLoadingAuth) {
+  if (isLoadingAuth && contextAuthUser === null) { // Show loading only if context hasn't confirmed user yet
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -122,6 +130,7 @@ export default function OnboardingPage() {
               selectedLanguage={nativeLanguage}
               onLanguageChange={setNativeLanguage}
               className="w-full text-base"
+              disabled={isSaving}
             />
           </div>
 
@@ -131,6 +140,7 @@ export default function OnboardingPage() {
               selectedLanguage={targetLanguage}
               onLanguageChange={setTargetLanguage}
               className="w-full text-base"
+              disabled={isSaving}
             />
           </div>
 
@@ -140,6 +150,7 @@ export default function OnboardingPage() {
               selectedMode={learningMode}
               onModeChange={setLearningMode}
               className="w-full text-base"
+              disabled={isSaving}
             />
              {learningMode.description && <p className="text-sm text-muted-foreground pt-1">{learningMode.description}</p>}
           </div>
