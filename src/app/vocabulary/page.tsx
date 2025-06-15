@@ -12,7 +12,7 @@ import { useLearning } from '@/context/LearningContext'; // Import useLearning
 
 // Placeholder for flashcard component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example: string, showBack: boolean }) => (
-  <div className="relative w-full max-w-md h-64 rounded-xl shadow-xl perspective group cursor-pointer">
+  <div className="relative w-full max-w-lg h-64 rounded-xl shadow-xl perspective group cursor-pointer"> {/* Changed max-w-md to max-w-lg */}
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
       <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6">
