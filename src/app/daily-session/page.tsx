@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Volume2, CheckSquare, Edit2, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare } from "lucide-react";
+import { Volume2, CheckSquare, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import Image from 'next/image';
 import { useLearning } from '@/context/LearningContext';
@@ -119,6 +119,12 @@ export default function DailySessionPage() {
       setPracticeStage('recognition'); 
     }
   };
+
+  const handlePreviousWord = () => {
+    if (currentWordIndex > 0) {
+      setCurrentWordIndex(prev => prev - 1);
+    }
+  };
   
   const progressPercentage = dailyWords.length > 0 ? ((currentWordIndex + 1) / dailyWords.length) * 100 : 0;
 
@@ -195,7 +201,10 @@ export default function DailySessionPage() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end">
+            <CardFooter className="flex justify-between">
+              <Button onClick={handlePreviousWord} variant="outline" disabled={currentWordIndex === 0}>
+                <ChevronLeft className="mr-2 h-5 w-5" /> Back
+              </Button>
               <Button onClick={handleNextWord} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 {currentWordIndex < dailyWords.length - 1 ? "Next Word" : "Got It! Move to Practice"} <ChevronRight className="ml-2 h-5 w-5" />
               </Button>
