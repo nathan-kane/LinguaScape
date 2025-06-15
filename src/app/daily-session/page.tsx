@@ -13,37 +13,61 @@ import type { DailyWordItem } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// Function to get placeholder words based on language
-const getPlaceholderDailyWords = (languageCode: string): DailyWordItem[] => {
+// Function to get placeholder words based on language and mode
+const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWordItem[] => {
   const commonProps = {
-    imageUrl: "https://placehold.co/200x150.png", // Adjusted placeholder size
+    imageUrl: "https://placehold.co/200x150.png",
     audioUrl: "#",
   };
 
+  const applyTravelAdjustments = (items: DailyWordItem[], lang: 'es' | 'fr' | 'ua'): DailyWordItem[] => {
+    if (modeId === 'travel') {
+      return items.map(item => {
+        if (lang === 'es') {
+          if (item.word === "Agua") return { ...item, exampleSentence: "Quiero agua, por favor.", dataAiHint: "water travel" };
+          if (item.word === "Manzana") return { ...item, exampleSentence: "¿Cuánto cuesta esta manzana?", dataAiHint: "apple market" };
+        }
+        if (lang === 'fr') {
+          if (item.word === "Eau") return { ...item, exampleSentence: "Je voudrais de l'eau, s'il vous plaît.", dataAiHint: "water travel" };
+          if (item.word === "Pomme") return { ...item, exampleSentence: "Combien coûte cette pomme?", dataAiHint: "apple market" };
+        }
+        if (lang === 'ua') {
+          if (item.word === "Вода") return { ...item, exampleSentence: "Я хочу води, будь ласка.", dataAiHint: "water travel" };
+          if (item.word === "Яблуко") return { ...item, exampleSentence: "Скільки коштує це яблуко?", dataAiHint: "apple market" };
+        }
+        return item;
+      });
+    }
+    return items;
+  };
+
   if (languageCode === 'es') {
-    return [
+    const spanishWords: DailyWordItem[] = [
       { wordBankId: "es1", word: "Manzana", translation: "Apple", ...commonProps, exampleSentence: "Yo como una manzana roja.", wordType: "noun", dataAiHint: "apple fruit" },
       { wordBankId: "es2", word: "Comer", translation: "To eat", ...commonProps, exampleSentence: "Me gusta comer frutas.", wordType: "verb", dataAiHint: "person eating" },
       { wordBankId: "es3", word: "Rojo/Roja", translation: "Red", ...commonProps, exampleSentence: "La manzana es roja.", wordType: "adjective", dataAiHint: "red color swatch" },
       { wordBankId: "es4", word: "Quiero", translation: "I want", ...commonProps, exampleSentence: "Quiero aprender español.", wordType: "phrase", dataAiHint: "person thinking" },
       { wordBankId: "es5", word: "Agua", translation: "Water", ...commonProps, exampleSentence: "Bebo agua todos los días.", wordType: "noun", dataAiHint: "glass water" },
     ];
+    return applyTravelAdjustments(spanishWords, 'es');
   } else if (languageCode === 'fr') {
-    return [
+    const frenchWords: DailyWordItem[] = [
       { wordBankId: "fr1", word: "Pomme", translation: "Apple", ...commonProps, exampleSentence: "Je mange une pomme.", wordType: "noun", dataAiHint: "apple fruit" },
       { wordBankId: "fr2", word: "Manger", translation: "To eat", ...commonProps, exampleSentence: "J'aime manger des fruits.", wordType: "verb", dataAiHint: "person eating" },
       { wordBankId: "fr3", word: "Rouge", translation: "Red", ...commonProps, exampleSentence: "La pomme est rouge.", wordType: "adjective", dataAiHint: "red color swatch" },
       { wordBankId: "fr4", word: "Je veux", translation: "I want", ...commonProps, exampleSentence: "Je veux apprendre le français.", wordType: "phrase", dataAiHint: "person thinking" },
       { wordBankId: "fr5", word: "Eau", translation: "Water", ...commonProps, exampleSentence: "Je bois de l'eau.", wordType: "noun", dataAiHint: "glass water" },
     ];
-  } else if (languageCode === 'ua') { // Using "ua" as per previous discussion
-    return [
+    return applyTravelAdjustments(frenchWords, 'fr');
+  } else if (languageCode === 'ua') {
+    const ukrainianWords: DailyWordItem[] = [
       { wordBankId: "ua1", word: "Яблуко", translation: "Apple", ...commonProps, exampleSentence: "Я їм яблуко.", wordType: "noun", dataAiHint: "apple fruit" },
       { wordBankId: "ua2", word: "Їсти", translation: "To eat", ...commonProps, exampleSentence: "Я люблю їсти фрукти.", wordType: "verb", dataAiHint: "person eating" },
       { wordBankId: "ua3", word: "Червоний", translation: "Red", ...commonProps, exampleSentence: "Яблуко червоне.", wordType: "adjective", dataAiHint: "red color swatch" },
       { wordBankId: "ua4", word: "Я хочу", translation: "I want", ...commonProps, exampleSentence: "Я хочу вивчати українську.", wordType: "phrase", dataAiHint: "person thinking" },
       { wordBankId: "ua5", word: "Вода", translation: "Water", ...commonProps, exampleSentence: "Я п'ю воду.", wordType: "noun", dataAiHint: "glass water" },
     ];
+    return applyTravelAdjustments(ukrainianWords, 'ua');
   }
   // Default to English or a generic set if no specific language match
   return [
@@ -65,16 +89,16 @@ export default function DailySessionPage() {
 
 
   useEffect(() => {
-    if (!isLoadingPreferences) { // Only proceed if language/mode preferences are loaded
+    if (!isLoadingPreferences) { 
       setIsLoadingLesson(true);
-      // Simulate fetching data based on selected language
+      // Simulate fetching data based on selected language and mode
       setTimeout(() => {
-        const relevantWords = getPlaceholderDailyWords(selectedLanguage.code);
+        const relevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
         setDailyWords(relevantWords.slice(0, 5)); // Take 5 words for the lesson
         setCurrentWordIndex(0);
         setPracticeStage('introduction');
         setIsLoadingLesson(false);
-      }, 500); // Shorter delay now
+      }, 500); 
     }
   }, [selectedLanguage, selectedMode, isLoadingPreferences]);
 
@@ -82,7 +106,6 @@ export default function DailySessionPage() {
 
   const playAudio = (audioUrl?: string) => {
     if (audioUrl && audioUrl !== "#") {
-      // In a real app, you'd use a proper audio player or Text-to-Speech
       alert(`Simulating audio playback for: ${currentWord?.word}`);
     } else {
       alert("Audio playback is simulated for this word.");
@@ -104,20 +127,20 @@ export default function DailySessionPage() {
       <AuthenticatedLayout>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="ml-4 text-muted-foreground">Loading your lesson for {selectedLanguage.name}...</p>
+          <p className="ml-4 text-muted-foreground">Loading your lesson for {selectedLanguage.name} ({selectedMode.name} mode)...</p>
         </div>
       </AuthenticatedLayout>
     );
   }
   
-  if (dailyWords.length === 0 && !isLoadingLesson) { // Check isLoadingLesson here
+  if (dailyWords.length === 0 && !isLoadingLesson) { 
      return (
       <AuthenticatedLayout>
         <Alert>
           <Lightbulb className="h-4 w-4" />
           <AlertTitle>No words for today!</AlertTitle>
           <AlertDescription>
-            It seems there are no new words scheduled for you in {selectedLanguage.name} ({selectedMode.name}) right now. Check back later or adjust your learning settings.
+            It seems there are no new words scheduled for you in {selectedLanguage.name} ({selectedMode.name} mode) right now. Check back later or adjust your learning settings.
             <Link href="/profile"><Button variant="link" className="p-0 h-auto ml-1">Go to Profile</Button></Link>
           </AlertDescription>
         </Alert>
