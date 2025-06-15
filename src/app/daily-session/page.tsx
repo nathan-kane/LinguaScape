@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Volume2, CheckSquare, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare, ChevronLeft, AlertCircle, CheckCircle, Brain } from "lucide-react";
+import { Volume2, CheckSquare, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare, ChevronLeft, AlertCircle, CheckCircle, Brain, Languages } from "lucide-react";
 import Link from "next/link";
 import Image from 'next/image';
 import { useLearning } from '@/context/LearningContext';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { generateMiniStory, MiniStoryInput } from '@/ai/flows/mini-story-flow';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 
 // Function to get placeholder words based on language and mode
@@ -140,7 +141,7 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export default function DailySessionPage() {
-  const { selectedLanguage, selectedMode, isLoadingPreferences } = useLearning();
+  const { selectedLanguage, selectedMode, nativeLanguage, isLoadingPreferences } = useLearning();
   const { toast } = useToast();
   const [dailyWords, setDailyWords] = useState<DailyWordItem[]>([]);
   const [isLoadingLesson, setIsLoadingLesson] = useState(true);
@@ -156,12 +157,13 @@ export default function DailySessionPage() {
   
   // Story Stage
   const [miniStoryText, setMiniStoryText] = useState<string | null>(null);
+  const [translatedMiniStoryText, setTranslatedMiniStoryText] = useState<string | null>(null);
   const [isLoadingStory, setIsLoadingStory] = useState<boolean>(false);
   
   const [practiceStage, setPracticeStage] = useState<'introduction' | 'recognition' | 'story' | 'chat'>('introduction');
 
   useEffect(() => {
-    if (!isLoadingPreferences && selectedLanguage && selectedMode) { 
+    if (!isLoadingPreferences && selectedLanguage && selectedMode && nativeLanguage) { 
       setIsLoadingLesson(true);
       setTimeout(() => { // Simulate async fetch
         const allRelevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
@@ -175,11 +177,12 @@ export default function DailySessionPage() {
         setRecognitionFeedback(null);
         setCurrentRecognitionIndex(0);
         setMiniStoryText(null);
+        setTranslatedMiniStoryText(null);
         setIsLoadingStory(false);
         setIsLoadingLesson(false);
       }, 500); 
     }
-  }, [selectedLanguage, selectedMode, isLoadingPreferences]);
+  }, [selectedLanguage, selectedMode, nativeLanguage, isLoadingPreferences]);
 
   const currentIntroWord = dailyWords[currentIntroWordIndex];
   const introProgressPercentage = dailyWords.length > 0 ? ((currentIntroWordIndex + 1) / dailyWords.length) * 100 : 0;
@@ -193,13 +196,11 @@ export default function DailySessionPage() {
       setCurrentIntroWordIndex(prev => prev + 1);
     } else {
       setPracticeStage('recognition'); 
-      if (dailyWords.length > 0) { // Ensure dailyWords is not empty before setting up question
+      if (dailyWords.length > 0) { 
         setupRecognitionQuestion(0);
       } else {
-        // If dailyWords is empty (e.g. initial load issue or no words returned)
-        // directly move to story or handle appropriately.
         setPracticeStage('story');
-        fetchMiniStory(); // Or show a message indicating no words for recognition
+        fetchMiniStory(); 
       }
     }
   };
@@ -219,16 +220,14 @@ export default function DailySessionPage() {
     const wordItem = dailyWords[index];
     const correctAnswer = wordItem.translation;
     
-    // Get all words from the broader placeholder list for the current language to pick distractors
     const allWordsForLanguage = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
 
     let distractors = allWordsForLanguage
-      .filter(dw => dw.wordBankId !== wordItem.wordBankId) // Exclude the current word
+      .filter(dw => dw.wordBankId !== wordItem.wordBankId) 
       .map(dw => dw.translation);
     
-    distractors = shuffleArray(distractors).slice(0, 2); // Pick 2 random distractors
+    distractors = shuffleArray(distractors).slice(0, 2); 
     
-    // Fallback if not enough unique distractors from the list
     const genericDistractors = ["Other Option 1", "Another Choice", "Different Answer", "Not this one"];
     let currentGenericDistractorIdx = 0;
     while (distractors.length < 2 && currentGenericDistractorIdx < genericDistractors.length) {
@@ -238,7 +237,6 @@ export default function DailySessionPage() {
         }
         currentGenericDistractorIdx++;
     }
-     // Ensure we always have 2 distractors, even if they are repeated generic ones (less ideal but handles very small word lists)
     while(distractors.length < 2) {
         distractors.push(`Placeholder ${distractors.length + 1}`);
     }
@@ -249,7 +247,7 @@ export default function DailySessionPage() {
     setSelectedOption(null);
     setRecognitionFeedback(null);
     setCurrentRecognitionIndex(index);
-  }, [dailyWords, selectedLanguage.code, selectedMode.id]); 
+  }, [dailyWords, selectedLanguage.code, selectedMode.id, fetchMiniStory]); 
 
   const handleOptionSelect = (option: string) => {
     if (recognitionFeedback) return;
@@ -274,22 +272,26 @@ export default function DailySessionPage() {
     }
   };
   
-  const fetchMiniStory = async () => {
+  const fetchMiniStoryCallback = useCallback(async () => {
     if (dailyWords.length === 0) {
         setMiniStoryText("No words available to create a story. Try starting a new lesson!");
+        setTranslatedMiniStoryText("");
         setIsLoadingStory(false);
         return;
     }
     setIsLoadingStory(true);
     setMiniStoryText(null);
+    setTranslatedMiniStoryText(null);
     try {
       const input: MiniStoryInput = {
         targetLanguage: selectedLanguage.name,
+        nativeLanguageName: nativeLanguage.name,
         learningMode: selectedMode.name, 
         dailyWords: dailyWords.map(w => w.word),
       };
       const result = await generateMiniStory(input);
       setMiniStoryText(result.storyText);
+      setTranslatedMiniStoryText(result.translatedStoryText);
     } catch (error) {
       console.error("Error generating mini story:", error);
       toast({
@@ -298,10 +300,14 @@ export default function DailySessionPage() {
         variant: "destructive",
       });
       setMiniStoryText(`Apologies, I couldn't create a story with ${selectedLanguage.name} words for the ${selectedMode.name} mode right now. Please try to use your new words in the chat!`);
+      setTranslatedMiniStoryText(`Translation is unavailable due to story generation error.`);
     } finally {
       setIsLoadingStory(false);
     }
-  };
+  }, [dailyWords, selectedLanguage, nativeLanguage, selectedMode, toast]);
+
+  // Expose fetchMiniStory for use in setupRecognitionQuestion and handleNextRecognitionItem
+  const fetchMiniStory = fetchMiniStoryCallback;
 
 
   if (isLoadingPreferences || isLoadingLesson) {
@@ -453,7 +459,7 @@ export default function DailySessionPage() {
               <CardTitle className="flex items-center gap-2"><BookOpen className="h-6 w-6 text-primary"/>Mini-Story Context</CardTitle>
               <CardDescription>See today's words in a short story, in {selectedLanguage.name}.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 min-h-[200px] flex flex-col justify-center">
+            <CardContent className="space-y-4 min-h-[250px] flex flex-col justify-center">
               {isLoadingStory && (
                 <div className="flex flex-col items-center justify-center text-muted-foreground">
                   <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3"></div>
@@ -461,9 +467,24 @@ export default function DailySessionPage() {
                 </div>
               )}
               {!isLoadingStory && miniStoryText && (
-                <ScrollArea className="h-48 p-4 bg-secondary/30 rounded-md border">
-                    <p className="text-foreground leading-relaxed whitespace-pre-wrap">{miniStoryText}</p>
-                </ScrollArea>
+                <>
+                  <ScrollArea className="h-36 p-4 bg-secondary/30 rounded-md border">
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{miniStoryText}</p>
+                  </ScrollArea>
+                  {translatedMiniStoryText && (
+                    <>
+                      <Separator className="my-3"/>
+                      <div className="space-y-1">
+                         <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                           <Languages className="h-4 w-4" /> Translation ({nativeLanguage.name}):
+                         </h4>
+                         <ScrollArea className="h-32 p-3 bg-muted/30 rounded-md border border-dashed">
+                            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{translatedMiniStoryText}</p>
+                         </ScrollArea>
+                      </div>
+                    </>
+                  )}
+                </>
               )}
               {!isLoadingStory && !miniStoryText && (
                  <Alert variant="destructive">
@@ -504,4 +525,3 @@ export default function DailySessionPage() {
     </AuthenticatedLayout>
   );
 }
-
