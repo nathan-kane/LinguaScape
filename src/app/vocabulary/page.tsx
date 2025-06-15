@@ -12,17 +12,17 @@ import { useLearning } from '@/context/LearningContext'; // Import useLearning
 
 // Placeholder for flashcard component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example: string, showBack: boolean }) => (
-  <div className="relative w-full max-w-lg h-64 rounded-xl shadow-xl perspective group cursor-pointer"> {/* Changed max-w-md to max-w-lg */}
+  <div className="relative w-[600px] h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
-      <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6">
-        <h3 className="text-3xl font-bold text-center text-foreground">{front}</h3>
+      <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6 text-center">
+        <h3 className="text-3xl font-bold text-foreground">{front}</h3>
         <p className="text-sm text-muted-foreground mt-4">Click to reveal</p>
       </div>
       {/* Back of card */}
-      <div className="absolute w-full h-full backface-hidden bg-accent text-accent-foreground border border-accent rounded-xl flex flex-col items-center justify-center p-6 rotate-y-180">
-        <h3 className="text-2xl font-semibold text-center">{back}</h3>
-        {example && <p className="text-sm mt-2 text-center italic">Example: "{example}"</p>}
+      <div className="absolute w-full h-full backface-hidden bg-accent text-accent-foreground border border-accent rounded-xl flex flex-col items-center justify-center p-6 text-center rotate-y-180">
+        <h3 className="text-2xl font-semibold">{back}</h3>
+        {example && <p className="text-sm mt-2 italic">Example: "{example}"</p>}
       </div>
     </div>
   </div>
@@ -38,7 +38,7 @@ const getSampleFlashcardContent = (languageCode: string): { front: string, back:
     return { front: "Дім", back: "House", example: "Цей дім великий." };
   }
   // Default to English or a generic set
-  return { front: "Hello", back: "Hola (Spanish)", example: "Hello, how are you?" };
+  return { front: "Hello World, this is a longer phrase to test wrapping", back: "Hola (Spanish) / Bonjour (French)", example: "Hello, how are you today my friend?" };
 };
 
 
@@ -50,6 +50,7 @@ export default function VocabularyPage() {
   useEffect(() => {
     if (!isLoadingPreferences) {
       setFlashcardContent(getSampleFlashcardContent(selectedLanguage.code));
+      setShowBack(false); // Reset card to front when language changes
     }
   }, [selectedLanguage, isLoadingPreferences]);
 
