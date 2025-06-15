@@ -1,3 +1,4 @@
+
 "use client";
 
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
@@ -6,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Zap, BookOpen, PlusCircle, ListChecks, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react"; // Import useState
+import { useState, useEffect } from "react"; 
+import { useLearning } from '@/context/LearningContext'; // Import useLearning
 
 // Placeholder for flashcard component
-const FlashcardPlaceholder = ({ front, back, showBack }: { front: string, back: string, showBack: boolean }) => (
+const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example: string, showBack: boolean }) => (
   <div className="relative w-full max-w-md h-64 rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
@@ -20,15 +22,36 @@ const FlashcardPlaceholder = ({ front, back, showBack }: { front: string, back: 
       {/* Back of card */}
       <div className="absolute w-full h-full backface-hidden bg-accent text-accent-foreground border border-accent rounded-xl flex flex-col items-center justify-center p-6 rotate-y-180">
         <h3 className="text-2xl font-semibold text-center">{back}</h3>
-        <p className="text-sm mt-2">Example: "La casa es bonita."</p>
+        {example && <p className="text-sm mt-2 text-center italic">Example: "{example}"</p>}
       </div>
     </div>
   </div>
 );
 
+// Function to get placeholder flashcard content based on language
+const getSampleFlashcardContent = (languageCode: string): { front: string, back: string, example: string } => {
+  if (languageCode === 'es') {
+    return { front: "Casa", back: "House", example: "La casa es grande." };
+  } else if (languageCode === 'fr') {
+    return { front: "Maison", back: "House", example: "La maison est grande." };
+  } else if (languageCode === 'ua') {
+    return { front: "Дім", back: "House", example: "Цей дім великий." };
+  }
+  // Default to English or a generic set
+  return { front: "Hello", back: "Hola (Spanish)", example: "Hello, how are you?" };
+};
+
 
 export default function VocabularyPage() {
-  const [showBack, setShowBack] = useState(false); // Manage flip state
+  const [showBack, setShowBack] = useState(false);
+  const { selectedLanguage, selectedMode, isLoadingPreferences } = useLearning();
+  const [flashcardContent, setFlashcardContent] = useState(getSampleFlashcardContent(selectedLanguage.code));
+
+  useEffect(() => {
+    if (!isLoadingPreferences) {
+      setFlashcardContent(getSampleFlashcardContent(selectedLanguage.code));
+    }
+  }, [selectedLanguage, isLoadingPreferences]);
 
   const handleCardClick = () => {
     setShowBack(!showBack);
@@ -40,6 +63,17 @@ export default function VocabularyPage() {
     { label: "Words Mastered", value: 150, icon: <Zap className="text-primary" /> },
   ];
 
+  if (isLoadingPreferences) {
+    return (
+      <AuthenticatedLayout>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="ml-4 text-muted-foreground">Loading vocabulary tools...</p>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
   return (
     <AuthenticatedLayout>
       <div className="space-y-8">
@@ -49,7 +83,7 @@ export default function VocabularyPage() {
               Vocabulary Master
             </h1>
             <p className="text-lg text-muted-foreground">
-              Strengthen your vocabulary with our Spaced Repetition System.
+              Strengthen your vocabulary in {selectedLanguage.name} ({selectedMode.name} mode) with our Spaced Repetition System.
             </p>
           </div>
           <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -59,8 +93,13 @@ export default function VocabularyPage() {
 
         {/* Main Flashcard Review Area */}
         <section className="flex flex-col items-center gap-8 py-8">
-          <div onClick={handleCardClick}> {/* Add click handler to toggle */}
-            <FlashcardPlaceholder front="Hola" back="Hello" showBack={showBack} />
+          <div onClick={handleCardClick}> 
+            <FlashcardPlaceholder 
+              front={flashcardContent.front} 
+              back={flashcardContent.back} 
+              example={flashcardContent.example}
+              showBack={showBack} 
+            />
           </div>
           <div className="flex gap-4 mt-4">
             <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10 w-28">Again</Button>
