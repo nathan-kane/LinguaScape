@@ -1,9 +1,10 @@
+
 import type { NavItem, Language, LearningMode } from './types';
-import { Home, BookOpen, Mic, Edit3, Headphones, BarChart3, Settings, Users, LogOut, Languages } from 'lucide-react';
+import { Home, BookOpen, Mic, Edit3, Headphones, Settings, Languages, CalendarCheck, TrendingUp, Smile } from 'lucide-react';
 
 export const APP_NAME = "LinguaScape";
 export const APP_DESCRIPTION = "Master new languages with interactive tools and AI-powered feedback.";
-export const APP_LOGO_ICON = Languages;
+export const APP_LOGO_ICON = Languages; // Default Lucide icon
 
 // Firebase Config
 export const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY as string;
@@ -13,40 +14,45 @@ export const FIREBASE_STORAGE_BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_
 export const FIREBASE_MESSAGING_SENDER_ID = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID as string;
 export const FIREBASE_APP_ID = process.env.NEXT_PUBLIC_FIREBASE_APP_ID as string;
 export const FIREBASE_MEASUREMENT_ID = process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID as string;
+
 export const NAV_LINKS_MAIN: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home, matchStartsWith: true },
+  { href: "/daily-session", label: "Daily Lesson", icon: CalendarCheck, matchStartsWith: true }, // New
   { href: "/vocabulary", label: "Vocabulary Master", icon: BookOpen, matchStartsWith: true },
   { href: "/pronunciation", label: "Pronunciation Ace", icon: Mic, matchStartsWith: true },
   { href: "/grammar", label: "Grammar Pro", icon: Edit3, matchStartsWith: true },
   { href: "/listening", label: "Contextual Listener", icon: Headphones, matchStartsWith: true },
+  { href: "/progress-tracker", label: "My Progress", icon: TrendingUp, matchStartsWith: true }, // New
+  // { href: "/cle-chat", label: "AI Chat Practice", icon: MessageSquare, matchStartsWith: true }, // Usually accessed via daily lesson
 ];
 
-export const NAV_LINKS_USER: NavItem[] = [
-  { href: "/settings", label: "Settings", icon: Settings, matchStartsWith: true },
+export const NAV_LINKS_USER: NavItem[] = [ // These appear in the user dropdown menu in AppHeader
+  { href: "/profile", label: "Profile", icon: Smile, matchStartsWith: true }, // Changed from /settings
+  { href: "/settings", label: "App Settings", icon: Settings, matchStartsWith: true },
   // { href: "/invite", label: "Invite Friends", icon: Users }, // Future feature
-  // { href: "/auth/logout", label: "Logout", icon: LogOut }, // Auth related, handle separately
 ];
 
 export const SUPPORTED_LANGUAGES: Language[] = [
-  { code: "en", name: "English", flag: "🇬🇧" }, // Changed US to GB for broader English
+  { code: "en", name: "English", flag: "🇬🇧" },
   { code: "es", name: "Español", flag: "🇪🇸" },
   { code: "fr", name: "Français", flag: "🇫🇷" },
   { code: "de", name: "Deutsch", flag: "🇩🇪" },
   { code: "it", name: "Italiano", flag: "🇮🇹" },
+  { code: "pt", name: "Português", flag: "🇵🇹" }, // Added Portuguese
   { code: "ru", name: "Русский", flag: "🇷🇺" },
   { code: "uk", name: "Українська", flag: "🇺🇦" },
   { code: "ja", name: "日本語", flag: "🇯🇵" },
   { code: "ko", name: "한국어", flag: "🇰🇷" },
-  { code: "zh", name: "中文", flag: "🇨🇳" },
+  { code: "zh", name: "中文 (简体)", flag: "🇨🇳" }, // Simplified Chinese
 ];
 
 export const LEARNING_MODES: LearningMode[] = [
   { id: "conversational", name: "Conversational", description: "Focus on everyday chat and interactions." },
-  { id: "everyday", name: "Everyday Life", description: "General vocabulary and phrases for daily life." },
-  { id: "work", name: "Professional", description: "Communication and industry-specific terms for work." },
+  { id: "beginner_basics", name: "Beginner Basics", description: "Fundamental vocabulary and grammar for new learners." },
   { id: "travel", name: "Travel", description: "Essential phrases for travelling." },
-  { id: "academic", name: "Academic", description: "Language for study and research." },
-  // { id: "love", name: "Love Language", description: "Expressing affection and romantic phrases." }, // Can be added later
+  { id: "work_professional", name: "Work/Professional", description: "Communication for business and specific industries." },
+  { id: "everyday_life", name: "Everyday Life", description: "General vocabulary for daily situations." },
+  // { id: "academic", name: "Academic", description: "Language for study and research." },
 ];
 
 export const DEFAULT_LANGUAGE: Language = SUPPORTED_LANGUAGES[0]; // English
