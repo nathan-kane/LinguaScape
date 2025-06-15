@@ -1,23 +1,24 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Volume2, CheckSquare, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare, ChevronLeft } from "lucide-react";
+import { Volume2, CheckSquare, BookOpen, ChevronRight, Zap, Lightbulb, MessageSquare, ChevronLeft, AlertCircle, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import Image from 'next/image';
 import { useLearning } from '@/context/LearningContext';
 import type { DailyWordItem } from '@/lib/types';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from '@/lib/utils';
 
 // Function to get placeholder words based on language and mode
 const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWordItem[] => {
   const commonProps = {
     imageUrl: "https://placehold.co/200x150.png",
-    audioUrl: "#",
+    audioUrl: "#", // Simulated audio
   };
 
   const applyTravelAdjustments = (items: DailyWordItem[], lang: 'es' | 'fr' | 'ua'): DailyWordItem[] => {
@@ -69,7 +70,6 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
     ];
     return applyTravelAdjustments(ukrainianWords, 'ua');
   }
-  // Default to English or a generic set if no specific language match
   return [
     { wordBankId: "en1", word: "Apple", translation: "Manzana (Spanish)", ...commonProps, exampleSentence: "I eat an apple.", wordType: "noun", dataAiHint: "apple fruit" },
     { wordBankId: "en2", word: "To eat", translation: "Comer (Spanish)", ...commonProps, exampleSentence: "I like to eat fruits.", wordType: "verb", dataAiHint: "person eating" },
@@ -79,54 +79,120 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
   ];
 };
 
+function shuffleArray<T>(array: T[]): T[] {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+}
 
 export default function DailySessionPage() {
   const { selectedLanguage, selectedMode, isLoadingPreferences } = useLearning();
   const [dailyWords, setDailyWords] = useState<DailyWordItem[]>([]);
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  const [practiceStage, setPracticeStage] = useState<'introduction' | 'recognition' | 'story' | 'chat'>('introduction');
   const [isLoadingLesson, setIsLoadingLesson] = useState(true);
 
+  // Introduction Stage
+  const [currentIntroWordIndex, setCurrentIntroWordIndex] = useState(0);
+  
+  // Recognition Stage
+  const [currentRecognitionIndex, setCurrentRecognitionIndex] = useState(0);
+  const [recognitionQuestion, setRecognitionQuestion] = useState<{ word: string; translation: string; options: string[] } | null>(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [recognitionFeedback, setRecognitionFeedback] = useState<{ message: string; correct: boolean } | null>(null);
+  
+  const [practiceStage, setPracticeStage] = useState<'introduction' | 'recognition' | 'story' | 'chat'>('introduction');
 
   useEffect(() => {
-    if (!isLoadingPreferences) { 
+    if (!isLoadingPreferences && selectedLanguage && selectedMode) { 
       setIsLoadingLesson(true);
-      // Simulate fetching data based on selected language and mode
       setTimeout(() => {
         const relevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
-        setDailyWords(relevantWords.slice(0, 5)); // Take 5 words for the lesson
-        setCurrentWordIndex(0);
+        setDailyWords(relevantWords.slice(0, 5)); 
+        setCurrentIntroWordIndex(0);
         setPracticeStage('introduction');
         setIsLoadingLesson(false);
       }, 500); 
     }
   }, [selectedLanguage, selectedMode, isLoadingPreferences]);
 
-  const currentWord = dailyWords[currentWordIndex];
+  const currentIntroWord = dailyWords[currentIntroWordIndex];
+  const introProgressPercentage = dailyWords.length > 0 ? ((currentIntroWordIndex + 1) / dailyWords.length) * 100 : 0;
 
   const playAudio = (audioUrl?: string) => {
-    if (audioUrl && audioUrl !== "#") {
-      alert(`Simulating audio playback for: ${currentWord?.word}`);
-    } else {
-      alert("Audio playback is simulated for this word.");
-    }
+    alert(audioUrl && audioUrl !== "#" ? `Simulating audio: ${currentIntroWord?.word}` : "Audio simulated.");
   };
 
-  const handleNextWord = () => {
-    if (currentWordIndex < dailyWords.length - 1) {
-      setCurrentWordIndex(prev => prev + 1);
+  const handleNextIntroWord = () => {
+    if (currentIntroWordIndex < dailyWords.length - 1) {
+      setCurrentIntroWordIndex(prev => prev + 1);
     } else {
       setPracticeStage('recognition'); 
+      setupRecognitionQuestion(0); // Initialize first recognition question
     }
   };
 
-  const handlePreviousWord = () => {
-    if (currentWordIndex > 0) {
-      setCurrentWordIndex(prev => prev - 1);
+  const handlePreviousIntroWord = () => {
+    if (currentIntroWordIndex > 0) {
+      setCurrentIntroWordIndex(prev => prev - 1);
     }
   };
-  
-  const progressPercentage = dailyWords.length > 0 ? ((currentWordIndex + 1) / dailyWords.length) * 100 : 0;
+
+  // Recognition Stage Logic
+  const setupRecognitionQuestion = useCallback((index: number) => {
+    if (index >= dailyWords.length || dailyWords.length === 0) {
+      setPracticeStage('story'); // Should not happen if called correctly
+      return;
+    }
+    const wordItem = dailyWords[index];
+    const correctAnswer = wordItem.translation;
+    
+    let distractors = dailyWords
+      .filter((_, i) => i !== index)
+      .map(dw => dw.translation);
+    
+    // Ensure enough unique distractors, add generic ones if needed
+    const neededDistractors = 2;
+    const genericDistractors = ["Other Option 1", "Other Option 2", "Another Choice", "Different Answer"];
+    let currentDistractorIdx = 0;
+    while (distractors.length < neededDistractors && currentDistractorIdx < genericDistractors.length) {
+        if (!distractors.includes(genericDistractors[currentDistractorIdx]) && correctAnswer !== genericDistractors[currentDistractorIdx]) {
+            distractors.push(genericDistractors[currentDistractorIdx]);
+        }
+        currentDistractorIdx++;
+    }
+    distractors = shuffleArray(distractors).slice(0, neededDistractors);
+
+    const options = shuffleArray([correctAnswer, ...distractors]);
+    
+    setRecognitionQuestion({ word: wordItem.word, translation: correctAnswer, options });
+    setSelectedOption(null);
+    setRecognitionFeedback(null);
+    setCurrentRecognitionIndex(index);
+  }, [dailyWords]);
+
+  const handleOptionSelect = (option: string) => {
+    if (recognitionFeedback) return; // Don't allow changing answer after feedback
+    setSelectedOption(option);
+  };
+
+  const handleCheckRecognitionAnswer = () => {
+    if (!recognitionQuestion || !selectedOption) return;
+    const correct = selectedOption === recognitionQuestion.translation;
+    setRecognitionFeedback({ 
+      message: correct ? "Correct!" : `Not quite. The correct translation for "${recognitionQuestion.word}" is "${recognitionQuestion.translation}".`, 
+      correct 
+    });
+  };
+
+  const handleNextRecognitionItem = () => {
+    if (currentRecognitionIndex < dailyWords.length - 1) {
+      setupRecognitionQuestion(currentRecognitionIndex + 1);
+    } else {
+      setPracticeStage('story'); 
+    }
+  };
 
   if (isLoadingPreferences || isLoadingLesson) {
     return (
@@ -146,14 +212,13 @@ export default function DailySessionPage() {
           <Lightbulb className="h-4 w-4" />
           <AlertTitle>No words for today!</AlertTitle>
           <AlertDescription>
-            It seems there are no new words scheduled for you in {selectedLanguage.name} ({selectedMode.name} mode) right now. Check back later or adjust your learning settings.
+            It seems there are no new words for you in {selectedLanguage.name} ({selectedMode.name} mode).
             <Link href="/profile"><Button variant="link" className="p-0 h-auto ml-1">Go to Profile</Button></Link>
           </AlertDescription>
         </Alert>
       </AuthenticatedLayout>
     );
   }
-
 
   return (
     <AuthenticatedLayout>
@@ -165,71 +230,107 @@ export default function DailySessionPage() {
           <p className="text-lg text-muted-foreground">
             Mode: {selectedMode.name} - Let's learn some new words!
           </p>
-           {dailyWords.length > 0 && <Progress value={progressPercentage} className="mt-2 h-2" />}
+           {practiceStage === 'introduction' && dailyWords.length > 0 && <Progress value={introProgressPercentage} className="mt-2 h-2" />}
+           {practiceStage === 'recognition' && dailyWords.length > 0 && <Progress value={(currentRecognitionIndex / dailyWords.length) * 100} className="mt-2 h-2" />}
         </section>
 
         {/* Introduction Stage */}
-        {practiceStage === 'introduction' && currentWord && (
+        {practiceStage === 'introduction' && currentIntroWord && (
           <Card className="shadow-xl bg-card">
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-2xl">
-                <span>New Word: <span className="text-primary">{currentWord.word}</span></span>
-                <span className="text-sm font-normal text-muted-foreground">({currentWord.wordType})</span>
+                <span>New Word: <span className="text-primary">{currentIntroWord.word}</span></span>
+                <span className="text-sm font-normal text-muted-foreground">({currentIntroWord.wordType})</span>
               </CardTitle>
-              <CardDescription>Word {currentWordIndex + 1} of {dailyWords.length}</CardDescription>
+              <CardDescription>Word {currentIntroWordIndex + 1} of {dailyWords.length}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex flex-col md:flex-row items-center gap-6">
-                {currentWord.imageUrl && (
+                {currentIntroWord.imageUrl && (
                   <Image
-                    src={currentWord.imageUrl}
-                    alt={`Image for ${currentWord.word}`}
+                    src={currentIntroWord.imageUrl}
+                    alt={`Image for ${currentIntroWord.word}`}
                     width={200}
                     height={150}
                     className="rounded-lg object-cover border shadow-md"
-                    data-ai-hint={currentWord.dataAiHint || `${currentWord.wordType} visual`}
+                    data-ai-hint={currentIntroWord.dataAiHint || `${currentIntroWord.wordType} visual`}
                   />
                 )}
                 <div className="flex-1 space-y-3">
-                  <p className="text-xl"><strong>Translation:</strong> {currentWord.translation}</p>
-                  {currentWord.exampleSentence && (
-                    <p className="text-lg italic text-muted-foreground">"{currentWord.exampleSentence}"</p>
+                  <p className="text-xl"><strong>Translation:</strong> {currentIntroWord.translation}</p>
+                  {currentIntroWord.exampleSentence && (
+                    <p className="text-lg italic text-muted-foreground">"{currentIntroWord.exampleSentence}"</p>
                   )}
-                   <Button onClick={() => playAudio(currentWord.audioUrl)} variant="outline" size="sm">
+                   <Button onClick={() => playAudio(currentIntroWord.audioUrl)} variant="outline" size="sm">
                     <Volume2 className="mr-2 h-5 w-5" /> Listen
                   </Button>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button onClick={handlePreviousWord} variant="outline" disabled={currentWordIndex === 0}>
+              <Button onClick={handlePreviousIntroWord} variant="outline" disabled={currentIntroWordIndex === 0}>
                 <ChevronLeft className="mr-2 h-5 w-5" /> Back
               </Button>
-              <Button onClick={handleNextWord} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                {currentWordIndex < dailyWords.length - 1 ? "Next Word" : "Got It! Move to Practice"} <ChevronRight className="ml-2 h-5 w-5" />
+              <Button onClick={handleNextIntroWord} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                {currentIntroWordIndex < dailyWords.length - 1 ? "Next Word" : "Got It! Move to Practice"} <ChevronRight className="ml-2 h-5 w-5" />
               </Button>
             </CardFooter>
           </Card>
         )}
 
-        {/* Recognition Practice Stage (Placeholder) */}
-        {practiceStage === 'recognition' && (
+        {/* Recognition Practice Stage */}
+        {practiceStage === 'recognition' && recognitionQuestion && (
           <Card className="shadow-lg bg-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><CheckSquare className="h-6 w-6 text-primary"/>Recognition Practice</CardTitle>
-              <CardDescription>Test your memory of today's words.</CardDescription>
+              <CardDescription>Question {currentRecognitionIndex + 1} of {dailyWords.length}: Match the word to its translation.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 text-center">
-              <p className="text-muted-foreground">(Interactive matching exercises will appear here)</p>
-              <p>E.g., Match "{dailyWords[0]?.word}" to its image, or listen and pick the correct word.</p>
-              <div className="flex justify-center gap-4 mt-4">
-                <Button variant="outline">Simulate Correct</Button>
-                <Button variant="outline">Simulate Incorrect</Button>
+            <CardContent className="space-y-6">
+              <p className="text-2xl font-semibold text-center text-primary py-4">
+                {recognitionQuestion.word}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {recognitionQuestion.options.map((option, idx) => (
+                  <Button
+                    key={idx}
+                    variant={selectedOption === option ? "default" : "outline"}
+                    className={cn(
+                      "w-full text-base py-6 h-auto justify-center",
+                      selectedOption === option && "ring-2 ring-primary-foreground ring-offset-2",
+                      recognitionFeedback && option === recognitionQuestion.translation && "bg-green-500/20 border-green-500 hover:bg-green-500/30",
+                      recognitionFeedback && selectedOption === option && option !== recognitionQuestion.translation && "bg-red-500/20 border-red-500 hover:bg-red-500/30"
+                    )}
+                    onClick={() => handleOptionSelect(option)}
+                    disabled={!!recognitionFeedback}
+                  >
+                    {option}
+                  </Button>
+                ))}
               </div>
-               <Button onClick={() => setPracticeStage('story')} className="mt-6 bg-primary hover:bg-primary/90 text-primary-foreground">
-                Continue to Mini-Story <ChevronRight className="ml-2 h-5 w-5" />
-              </Button>
+              {recognitionFeedback && (
+                <Alert variant={recognitionFeedback.correct ? "default" : "destructive"} className={recognitionFeedback.correct ? "border-green-500 bg-green-500/10" : "border-red-500 bg-red-500/10"}>
+                  {recognitionFeedback.correct ? <CheckCircle className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-red-600" />}
+                  <AlertTitle className={recognitionFeedback.correct ? "text-green-700" : "text-red-700"}>
+                    {recognitionFeedback.correct ? "Correct!" : "Incorrect"}
+                  </AlertTitle>
+                  <AlertDescription className={recognitionFeedback.correct ? "text-green-600" : "text-red-600"}>
+                    {recognitionFeedback.message}
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
+            <CardFooter>
+              {!recognitionFeedback ? (
+                <Button onClick={handleCheckRecognitionAnswer} disabled={!selectedOption} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                  Check Answer
+                </Button>
+              ) : (
+                <Button onClick={handleNextRecognitionItem} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                  {currentRecognitionIndex < dailyWords.length - 1 ? "Next Question" : "Continue to Mini-Story"}
+                  <ChevronRight className="ml-2 h-5 w-5" />
+                </Button>
+              )}
+            </CardFooter>
           </Card>
         )}
 
