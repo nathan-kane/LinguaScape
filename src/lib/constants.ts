@@ -40,7 +40,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   { code: "it", name: "Italiano", flag: "🇮🇹" },
   { code: "pt", name: "Português", flag: "🇵🇹" }, // Added Portuguese
   { code: "ru", name: "Русский", flag: "🇷🇺" },
-  { code: "uk", name: "Українська", flag: "🇺🇦" },
+  { code: "ua", name: "Українська", flag: "🇺🇦" }, // Changed "uk" to "ua"
   { code: "ja", name: "日本語", flag: "🇯🇵" },
   { code: "ko", name: "한국어", flag: "🇰🇷" },
   { code: "zh", name: "中文 (简体)", flag: "🇨🇳" }, // Simplified Chinese
@@ -57,3 +57,4 @@ export const LEARNING_MODES: LearningMode[] = [
 
 export const DEFAULT_LANGUAGE: Language = SUPPORTED_LANGUAGES[0]; // English
 export const DEFAULT_MODE: LearningMode = LEARNING_MODES[0]; // Conversational
+
