@@ -153,17 +153,24 @@ export default function VocabularyPage() {
                   showBack={showBack} 
                 />
               </div>
-              <div className="flex flex-wrap justify-center gap-4 mt-4">
-                <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10 w-24 sm:w-28" onClick={() => handleNextCard('again')}>Again</Button>
-                <Button variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 w-24 sm:w-28" onClick={() => handleNextCard('hard')}>Hard</Button>
-                <Button variant="outline" className="border-green-500 text-green-600 hover:bg-green-500/10 w-24 sm:w-28" onClick={() => handleNextCard('good')}>Good</Button>
-                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-24 sm:w-28" onClick={() => handleNextCard('easy')}>Easy</Button>
-              </div>
+              {showBack && (
+                <div className="text-center mt-4">
+                  <p className="text-md font-semibold text-muted-foreground">How well did you remember this?</p>
+                  <div className="flex flex-wrap justify-center gap-3 sm:gap-4 mt-2">
+                    <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10 w-24 sm:w-28" onClick={() => handleNextCard('again')}>Again</Button>
+                    <Button variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 w-24 sm:w-28" onClick={() => handleNextCard('hard')}>Hard</Button>
+                    <Button variant="outline" className="border-green-500 text-green-600 hover:bg-green-500/10 w-24 sm:w-28" onClick={() => handleNextCard('good')}>Good</Button>
+                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground w-24 sm:w-28" onClick={() => handleNextCard('easy')}>Easy</Button>
+                  </div>
+                </div>
+              )}
                <Button variant="link" onClick={() => handleNextCard()} className="mt-2 text-primary">
-                  Next Card <ChevronRight className="ml-1 h-4 w-4" />
+                  Skip to Next Card <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               <p className="text-sm text-muted-foreground">
-                Card {currentCardIndex + 1} of {sessionWords.length}. Select how well you knew it.
+                Card {currentCardIndex + 1} of {sessionWords.length}.
+                {!showBack && " Click card to reveal."}
+                {showBack && " Select how well you knew it or skip."}
               </p>
             </>
           ) : (
@@ -172,8 +179,6 @@ export default function VocabularyPage() {
               <CardTitle>No words loaded</CardTitle>
               <CardDescription>There are no vocabulary words for the current selection, or the session is still loading.</CardDescription>
               <Button onClick={() => {
-                  // Trigger re-fetch or re-init of words
-                  // For now, just a placeholder to potentially force reload effect
                   setIsLoadingSession(true);
                    setTimeout(() => {
                     const words = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
@@ -244,3 +249,4 @@ export default function VocabularyPage() {
     </AuthenticatedLayout>
   );
 }
+
