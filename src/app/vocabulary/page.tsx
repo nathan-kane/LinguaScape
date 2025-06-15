@@ -153,6 +153,7 @@ export default function VocabularyPage() {
                   showBack={showBack} 
                 />
               </div>
+              
               {showBack && (
                 <div className="text-center mt-4">
                   <p className="text-md font-semibold text-muted-foreground">How well did you remember this?</p>
@@ -164,9 +165,11 @@ export default function VocabularyPage() {
                   </div>
                 </div>
               )}
-               <Button variant="link" onClick={() => handleNextCard()} className="mt-2 text-primary">
-                  Skip to Next Card <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
+
+              <Button variant="link" onClick={() => handleNextCard()} className="mt-2 text-primary">
+                Skip to Next Card <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+              
               <p className="text-sm text-muted-foreground">
                 Card {currentCardIndex + 1} of {sessionWords.length}.
                 {!showBack && " Click card to reveal."}
