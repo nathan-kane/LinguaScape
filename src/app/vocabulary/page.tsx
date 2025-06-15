@@ -170,7 +170,7 @@ export default function VocabularyPage() {
               <p className="text-sm text-muted-foreground">
                 Card {currentCardIndex + 1} of {sessionWords.length}.
                 {!showBack && " Click card to reveal."}
-                {showBack && " Select how well you knew it or skip."}
+                {showBack && " Select how well you knew it or skip to the next card."}
               </p>
             </>
           ) : (
