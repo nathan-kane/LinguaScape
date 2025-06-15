@@ -8,11 +8,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Send, User, Bot, Zap, AlertCircle, Mic } from "lucide-react";
+import { MessageSquare, Send, User, Bot } from "lucide-react"; // Removed unused icons like Zap, AlertCircle, Mic
 import { useLearning } from '@/context/LearningContext';
 import type { ChatMessage } from '@/lib/types';
 import { getCleConversationResponse, CleConversationInput } from '@/ai/flows/cle-conversation-flow';
 import { useToast } from '@/hooks/use-toast';
+
+const getInitialAiGreeting = (languageName: string, scene: string, wordsCount: number): string => {
+  const wordMessage = wordsCount > 0 ? "using your new words" : "about anything you like";
+  switch (languageName.toLowerCase()) {
+    case 'español':
+      return `¡Hola! Bienvenido/a a ${scene}. ¿Sobre qué te gustaría hablar ${wordMessage}?`;
+    case 'français':
+      return `Bonjour ! Bienvenue à ${scene}. De quoi aimerais-tu parler ${wordMessage} ?`;
+    case 'українська':
+      return `Привіт! Ласкаво просимо до ${scene}. Про що б ти хотів/хотіла поговорити, ${wordMessage}?`;
+    default: // English or other languages
+      return `Hello! Welcome to the ${scene}. What would you like to talk about ${wordMessage}?`;
+  }
+};
+
 
 // Helper component to access searchParams within Suspense boundary
 function ChatContent() {
@@ -24,20 +39,24 @@ function ChatContent() {
   const [userInput, setUserInput] = useState("");
   const [isLoadingAiResponse, setIsLoadingAiResponse] = useState(false);
   const [targetWords, setTargetWords] = useState<string[]>([]);
-  const [currentScene, setCurrentScene] = useState("at a local market"); // Example scene
+  const [currentScene, setCurrentScene] = useState("a local market"); // Example scene
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const wordsQueryParam = searchParams.get('words');
+    let currentTargetWords: string[] = [];
     if (wordsQueryParam) {
-      setTargetWords(wordsQueryParam.split(','));
+      currentTargetWords = wordsQueryParam.split(',');
+      setTargetWords(currentTargetWords);
     }
-    // Initial greeting from AI
+    
+    // Initial greeting from AI, now dynamic
+    const greetingText = getInitialAiGreeting(selectedLanguage.name, currentScene, currentTargetWords.length);
     setMessages([
-      { id: Date.now().toString(), speaker: 'ai', text: `¡Hola! Welcome to the ${currentScene}. What would you like to talk about using your new words?`, timestamp: Date.now() }
+      { id: Date.now().toString(), speaker: 'ai', text: greetingText, timestamp: Date.now() }
     ]);
-  }, [searchParams, currentScene]);
+  }, [searchParams, currentScene, selectedLanguage]); // Added selectedLanguage dependency
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -60,10 +79,11 @@ function ChatContent() {
     setIsLoadingAiResponse(true);
 
     try {
+      // Prepare chat history for AI, ensuring it's just text and speaker
       const chatHistoryForAI = messages.map(m => ({ speaker: m.speaker, text: m.text }));
       
       const input: CleConversationInput = {
-        targetLanguage: selectedLanguage.name, // Or selectedLanguage.code, adjust flow accordingly
+        targetLanguage: selectedLanguage.name, 
         currentScene: currentScene,
         todaysWords: targetWords,
         userMessage: newUserMessage.text,
@@ -168,10 +188,6 @@ function ChatContent() {
         </CardContent>
         <CardFooter className="border-t p-4">
           <div className="flex w-full items-center gap-2">
-            {/* Placeholder for word bank/scaffolding button */}
-            {/* <Button variant="outline" size="icon" className="shrink-0">
-              <Zap className="h-5 w-5" /> 
-            </Button> */}
             <Input
               type="text"
               placeholder="Type your message..."
@@ -181,9 +197,6 @@ function ChatContent() {
               disabled={isLoadingAiResponse}
               className="flex-1 text-base"
             />
-            {/* <Button variant="outline" size="icon" className="shrink-0" disabled={isLoadingAiResponse}>
-              <Mic className="h-5 w-5" />
-            </Button> */}
             <Button onClick={handleSendMessage} disabled={isLoadingAiResponse || !userInput.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Send className="h-5 w-5" />
               <span className="sr-only">Send</span>
@@ -191,16 +204,6 @@ function ChatContent() {
           </div>
         </CardFooter>
       </Card>
-
-      {/* Placeholder for sentence scaffolding / word bank */}
-      {/* <Card className="shadow-md bg-card">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><Zap className="h-5 w-5 text-accent"/>Need help?</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Word suggestions or sentence starters will appear here.</p>
-        </CardContent>
-      </Card> */}
     </div>
   );
 }
@@ -215,3 +218,4 @@ export default function CleChatPage() {
     </AuthenticatedLayout>
   );
 }
+
