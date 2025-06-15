@@ -25,24 +25,41 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
     audioUrl: "#", // Simulated audio
   };
 
-  const applyTravelAdjustments = (items: DailyWordItem[], lang: 'es' | 'fr' | 'ua'): DailyWordItem[] => {
+  const applyModeAdjustments = (items: DailyWordItem[], lang: 'es' | 'fr' | 'ua' | 'en'): DailyWordItem[] => {
     if (modeId === 'travel') {
       return items.map(item => {
         if (lang === 'es') {
           if (item.word === "Agua") return { ...item, exampleSentence: "Quiero agua, por favor.", dataAiHint: "water travel" };
           if (item.word === "Manzana") return { ...item, exampleSentence: "¿Cuánto cuesta esta manzana?", dataAiHint: "apple market" };
+          if (item.word === "Boleto") return { ...item, exampleSentence: "Necesito un boleto de avión.", dataAiHint: "ticket travel" };
+          if (item.word === "Hotel") return { ...item, exampleSentence: "Reservé un hotel cerca de la playa.", dataAiHint: "hotel building" };
+          if (item.word === "Libro") return { ...item, exampleSentence: "Compro una guía de viajes.", dataAiHint: "travel guide" };
         }
         if (lang === 'fr') {
           if (item.word === "Eau") return { ...item, exampleSentence: "Je voudrais de l'eau, s'il vous plaît.", dataAiHint: "water travel" };
           if (item.word === "Pomme") return { ...item, exampleSentence: "Combien coûte cette pomme?", dataAiHint: "apple market" };
+          if (item.word === "Billet") return { ...item, exampleSentence: "J'ai besoin d'un billet de train.", dataAiHint: "ticket travel" };
+          if (item.word === "Hôtel") return { ...item, exampleSentence: "Nous cherchons un hôtel.", dataAiHint: "hotel building" };
+          if (item.word === "Livre") return { ...item, exampleSentence: "J'achète un plan de la ville.", dataAiHint: "city map" };
         }
         if (lang === 'ua') {
           if (item.word === "Вода") return { ...item, exampleSentence: "Я хочу води, будь ласка.", dataAiHint: "water travel" };
           if (item.word === "Яблуко") return { ...item, exampleSentence: "Скільки коштує це яблуко?", dataAiHint: "apple market" };
+          if (item.word === "Квиток") return { ...item, exampleSentence: "Мені потрібен квиток на автобус.", dataAiHint: "ticket travel" };
+          if (item.word === "Готель") return { ...item, exampleSentence: "Ми зупинилися в гарному готелі.", dataAiHint: "hotel building" };
+          if (item.word === "Книга") return { ...item, exampleSentence: "Я читаю книгу про подорожі.", dataAiHint: "travel book" };
+        }
+        if (lang === 'en') {
+            if (item.word === "Water") return { ...item, exampleSentence: "Can I have some water, please?", dataAiHint: "water travel" };
+            if (item.word === "Apple") return { ...item, exampleSentence: "How much for these apples?", dataAiHint: "apple market" };
+            if (item.word === "Ticket") return { ...item, exampleSentence: "I need a ticket to London.", dataAiHint: "ticket travel" };
+            if (item.word === "Hotel") return { ...item, exampleSentence: "Is there a hotel nearby?", dataAiHint: "hotel building" };
+            if (item.word === "Book") return { ...item, exampleSentence: "I'd like to book a tour.", dataAiHint: "tour booking" };
         }
         return item;
       });
     }
+    // Add other mode adjustments here if needed for 'conversational', etc.
     return items;
   };
 
@@ -53,8 +70,15 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
       { wordBankId: "es3", word: "Rojo/Roja", translation: "Red", ...commonProps, exampleSentence: "La manzana es roja.", wordType: "adjective", dataAiHint: "red color swatch" },
       { wordBankId: "es4", word: "Quiero", translation: "I want", ...commonProps, exampleSentence: "Quiero aprender español.", wordType: "phrase", dataAiHint: "person thinking" },
       { wordBankId: "es5", word: "Agua", translation: "Water", ...commonProps, exampleSentence: "Bebo agua todos los días.", wordType: "noun", dataAiHint: "glass water" },
+      { wordBankId: "es6", word: "Libro", translation: "Book", ...commonProps, exampleSentence: "Leo un libro interesante.", wordType: "noun", dataAiHint: "open book" },
+      { wordBankId: "es7", word: "Boleto", translation: "Ticket", ...commonProps, exampleSentence: "Tengo un boleto para el concierto.", wordType: "noun", dataAiHint: "concert ticket" },
+      { wordBankId: "es8", word: "Hotel", translation: "Hotel", ...commonProps, exampleSentence: "El hotel es grande.", wordType: "noun", dataAiHint: "hotel building" },
+      { wordBankId: "es9", word: "Playa", translation: "Beach", ...commonProps, exampleSentence: "Vamos a la playa mañana.", wordType: "noun", dataAiHint: "beach scene" },
+      { wordBankId: "es10", word: "Ayuda", translation: "Help", ...commonProps, exampleSentence: "Necesito ayuda con esto.", wordType: "noun", dataAiHint: "helping hand" },
+      { wordBankId: "es11", word: "Gracias", translation: "Thank you", ...commonProps, exampleSentence: "Muchas gracias por tu amabilidad.", wordType: "phrase", dataAiHint: "gratitude symbol" },
+      { wordBankId: "es12", word: "Por favor", translation: "Please", ...commonProps, exampleSentence: "Un café, por favor.", wordType: "phrase", dataAiHint: "polite gesture" },
     ];
-    return applyTravelAdjustments(spanishWords, 'es');
+    return applyModeAdjustments(spanishWords, 'es');
   } else if (languageCode === 'fr') {
     const frenchWords: DailyWordItem[] = [
       { wordBankId: "fr1", word: "Pomme", translation: "Apple", ...commonProps, exampleSentence: "Je mange une pomme.", wordType: "noun", dataAiHint: "apple fruit" },
@@ -62,8 +86,15 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
       { wordBankId: "fr3", word: "Rouge", translation: "Red", ...commonProps, exampleSentence: "La pomme est rouge.", wordType: "adjective", dataAiHint: "red color swatch" },
       { wordBankId: "fr4", word: "Je veux", translation: "I want", ...commonProps, exampleSentence: "Je veux apprendre le français.", wordType: "phrase", dataAiHint: "person thinking" },
       { wordBankId: "fr5", word: "Eau", translation: "Water", ...commonProps, exampleSentence: "Je bois de l'eau.", wordType: "noun", dataAiHint: "glass water" },
+      { wordBankId: "fr6", word: "Livre", translation: "Book", ...commonProps, exampleSentence: "J'aime lire ce livre.", wordType: "noun", dataAiHint: "reading book" },
+      { wordBankId: "fr7", word: "Billet", translation: "Ticket", ...commonProps, exampleSentence: "J'ai un billet pour le film.", wordType: "noun", dataAiHint: "movie ticket" },
+      { wordBankId: "fr8", word: "Hôtel", translation: "Hotel", ...commonProps, exampleSentence: "L'hôtel est très chic.", wordType: "noun", dataAiHint: "luxury hotel" },
+      { wordBankId: "fr9", word: "Plage", translation: "Beach", ...commonProps, exampleSentence: "La plage est belle.", wordType: "noun", dataAiHint: "beautiful beach" },
+      { wordBankId: "fr10", word: "Aide", translation: "Help", ...commonProps, exampleSentence: "Pouvez-vous m'aider?", wordType: "noun", dataAiHint: "support symbol" },
+      { wordBankId: "fr11", word: "Merci", translation: "Thank you", ...commonProps, exampleSentence: "Merci beaucoup!", wordType: "phrase", dataAiHint: "thank you card" },
+      { wordBankId: "fr12", word: "S'il vous plaît", translation: "Please", ...commonProps, exampleSentence: "Un thé, s'il vous plaît.", wordType: "phrase", dataAiHint: "request gesture" },
     ];
-    return applyTravelAdjustments(frenchWords, 'fr');
+    return applyModeAdjustments(frenchWords, 'fr');
   } else if (languageCode === 'ua') {
     const ukrainianWords: DailyWordItem[] = [
       { wordBankId: "ua1", word: "Яблуко", translation: "Apple", ...commonProps, exampleSentence: "Я їм яблуко.", wordType: "noun", dataAiHint: "apple fruit" },
@@ -71,18 +102,32 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
       { wordBankId: "ua3", word: "Червоний", translation: "Red", ...commonProps, exampleSentence: "Яблуко червоне.", wordType: "adjective", dataAiHint: "red color swatch" },
       { wordBankId: "ua4", word: "Я хочу", translation: "I want", ...commonProps, exampleSentence: "Я хочу вивчати українську.", wordType: "phrase", dataAiHint: "person thinking" },
       { wordBankId: "ua5", word: "Вода", translation: "Water", ...commonProps, exampleSentence: "Я п'ю воду.", wordType: "noun", dataAiHint: "glass water" },
+      { wordBankId: "ua6", word: "Книга", translation: "Book", ...commonProps, exampleSentence: "Це цікава книга.", wordType: "noun", dataAiHint: "interesting book" },
+      { wordBankId: "ua7", word: "Квиток", translation: "Ticket", ...commonProps, exampleSentence: "Де мій квиток?", wordType: "noun", dataAiHint: "lost ticket" },
+      { wordBankId: "ua8", word: "Готель", translation: "Hotel", ...commonProps, exampleSentence: "Готель знаходиться в центрі.", wordType: "noun", dataAiHint: "city hotel" },
+      { wordBankId: "ua9", word: "Пляж", translation: "Beach", ...commonProps, exampleSentence: "Ми йдемо на пляж.", wordType: "noun", dataAiHint: "going to beach" },
+      { wordBankId: "ua10", word: "Допомога", translation: "Help", ...commonProps, exampleSentence: "Мені потрібна допомога.", wordType: "noun", dataAiHint: "need help" },
+      { wordBankId: "ua11", word: "Дякую", translation: "Thank you", ...commonProps, exampleSentence: "Щиро дякую!", wordType: "phrase", dataAiHint: "sincere thanks" },
+      { wordBankId: "ua12", word: "Будь ласка", translation: "Please", ...commonProps, exampleSentence: "Дайте, будь ласка, меню.", wordType: "phrase", dataAiHint: "asking please" },
     ];
-    return applyTravelAdjustments(ukrainianWords, 'ua');
+    return applyModeAdjustments(ukrainianWords, 'ua');
   }
-  // Default English words if no match
+  // Default English words if no match (expanded list)
     const englishWords: DailyWordItem[] = [
     { wordBankId: "en1", word: "Apple", translation: "Manzana (Spanish)", ...commonProps, exampleSentence: "I eat an apple.", wordType: "noun", dataAiHint: "apple fruit" },
     { wordBankId: "en2", word: "To eat", translation: "Comer (Spanish)", ...commonProps, exampleSentence: "I like to eat fruits.", wordType: "verb", dataAiHint: "person eating" },
     { wordBankId: "en3", word: "Red", translation: "Rojo (Spanish)", ...commonProps, exampleSentence: "The apple is red.", wordType: "adjective", dataAiHint: "red color swatch" },
     { wordBankId: "en4", word: "I want", translation: "Quiero (Spanish)", ...commonProps, exampleSentence: "I want to learn.", wordType: "phrase", dataAiHint: "person thinking" },
     { wordBankId: "en5", word: "Water", translation: "Agua (Spanish)", ...commonProps, exampleSentence: "I drink water.", wordType: "noun", dataAiHint: "glass water" },
+    { wordBankId: "en6", word: "Book", translation: "Libro (Spanish)", ...commonProps, exampleSentence: "This is a good book.", wordType: "noun", dataAiHint: "good book" },
+    { wordBankId: "en7", word: "Ticket", translation: "Boleto (Spanish)", ...commonProps, exampleSentence: "I have a ticket for the show.", wordType: "noun", dataAiHint: "show ticket" },
+    { wordBankId: "en8", word: "Hotel", translation: "Hotel (Spanish)", ...commonProps, exampleSentence: "The hotel is nice.", wordType: "noun", dataAiHint: "nice hotel" },
+    { wordBankId: "en9", word: "Beach", translation: "Playa (Spanish)", ...commonProps, exampleSentence: "Let's go to the beach.", wordType: "noun", dataAiHint: "sunny beach" },
+    { wordBankId: "en10", word: "Help", translation: "Ayuda (Spanish)", ...commonProps, exampleSentence: "Can you help me?", wordType: "verb", dataAiHint: "helping gesture" },
+    { wordBankId: "en11", word: "Thank you", translation: "Gracias (Spanish)", ...commonProps, exampleSentence: "Thank you very much.", wordType: "phrase", dataAiHint: "appreciation" },
+    { wordBankId: "en12", word: "Please", translation: "Por favor (Spanish)", ...commonProps, exampleSentence: "More coffee, please.", wordType: "phrase", dataAiHint: "polite request" },
   ];
-  return applyTravelAdjustments(englishWords, selectedLanguage.code as 'es' | 'fr' | 'ua'); // Apply travel to default if applicable
+  return applyModeAdjustments(englishWords, 'en');
 };
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -119,8 +164,9 @@ export default function DailySessionPage() {
     if (!isLoadingPreferences && selectedLanguage && selectedMode) { 
       setIsLoadingLesson(true);
       setTimeout(() => { // Simulate async fetch
-        const relevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
-        setDailyWords(relevantWords.slice(0, 5)); 
+        const allRelevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
+        const shuffledWords = shuffleArray(allRelevantWords);
+        setDailyWords(shuffledWords.slice(0, 5)); // Select 5 random words for the session
         setCurrentIntroWordIndex(0);
         setPracticeStage('introduction');
         // Reset other stage-specific states
@@ -147,7 +193,14 @@ export default function DailySessionPage() {
       setCurrentIntroWordIndex(prev => prev + 1);
     } else {
       setPracticeStage('recognition'); 
-      setupRecognitionQuestion(0);
+      if (dailyWords.length > 0) { // Ensure dailyWords is not empty before setting up question
+        setupRecognitionQuestion(0);
+      } else {
+        // If dailyWords is empty (e.g. initial load issue or no words returned)
+        // directly move to story or handle appropriately.
+        setPracticeStage('story');
+        fetchMiniStory(); // Or show a message indicating no words for recognition
+      }
     }
   };
 
@@ -159,42 +212,44 @@ export default function DailySessionPage() {
 
   const setupRecognitionQuestion = useCallback((index: number) => {
     if (index >= dailyWords.length || dailyWords.length === 0) {
-      // This case should ideally be handled by handleNextRecognitionItem logic
-      // to transition to story stage. If it's reached, it's likely an error or empty dailyWords.
       setPracticeStage('story'); 
-      fetchMiniStory(); // Attempt to fetch story if words are empty but moving to story stage
+      fetchMiniStory();
       return;
     }
     const wordItem = dailyWords[index];
     const correctAnswer = wordItem.translation;
     
-    let distractors = dailyWords
-      .filter((_, i) => i !== index)
+    // Get all words from the broader placeholder list for the current language to pick distractors
+    const allWordsForLanguage = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
+
+    let distractors = allWordsForLanguage
+      .filter(dw => dw.wordBankId !== wordItem.wordBankId) // Exclude the current word
       .map(dw => dw.translation);
     
-    const neededDistractors = 2;
+    distractors = shuffleArray(distractors).slice(0, 2); // Pick 2 random distractors
+    
+    // Fallback if not enough unique distractors from the list
     const genericDistractors = ["Other Option 1", "Another Choice", "Different Answer", "Not this one"];
-    let currentDistractorIdx = 0;
-    while (distractors.length < neededDistractors && currentDistractorIdx < genericDistractors.length) {
-        const distractorCandidate = genericDistractors[currentDistractorIdx];
+    let currentGenericDistractorIdx = 0;
+    while (distractors.length < 2 && currentGenericDistractorIdx < genericDistractors.length) {
+        const distractorCandidate = genericDistractors[currentGenericDistractorIdx];
         if (!distractors.includes(distractorCandidate) && correctAnswer !== distractorCandidate) {
             distractors.push(distractorCandidate);
         }
-        currentDistractorIdx++;
+        currentGenericDistractorIdx++;
     }
-    // Ensure we have enough distractors, even if they are repeated generic ones (less ideal but handles small dailyWords list)
-    while(distractors.length < neededDistractors) {
+     // Ensure we always have 2 distractors, even if they are repeated generic ones (less ideal but handles very small word lists)
+    while(distractors.length < 2) {
         distractors.push(`Placeholder ${distractors.length + 1}`);
     }
     
-    distractors = shuffleArray(distractors).slice(0, neededDistractors);
     const options = shuffleArray([correctAnswer, ...distractors]);
     
     setRecognitionQuestion({ word: wordItem.word, translation: correctAnswer, options });
     setSelectedOption(null);
     setRecognitionFeedback(null);
     setCurrentRecognitionIndex(index);
-  }, [dailyWords]); // Removed fetchMiniStory from here, it will be called on transition
+  }, [dailyWords, selectedLanguage.code, selectedMode.id]); 
 
   const handleOptionSelect = (option: string) => {
     if (recognitionFeedback) return;
@@ -215,7 +270,7 @@ export default function DailySessionPage() {
       setupRecognitionQuestion(currentRecognitionIndex + 1);
     } else {
       setPracticeStage('story');
-      fetchMiniStory(); // Fetch story when transitioning to story stage
+      fetchMiniStory(); 
     }
   };
   
@@ -229,8 +284,8 @@ export default function DailySessionPage() {
     setMiniStoryText(null);
     try {
       const input: MiniStoryInput = {
-        targetLanguage: selectedLanguage.name, // Use name for AI prompt clarity
-        learningMode: selectedMode.name, // Use name for AI prompt clarity
+        targetLanguage: selectedLanguage.name,
+        learningMode: selectedMode.name, 
         dailyWords: dailyWords.map(w => w.word),
       };
       const result = await generateMiniStory(input);
@@ -449,3 +504,4 @@ export default function DailySessionPage() {
     </AuthenticatedLayout>
   );
 }
+
