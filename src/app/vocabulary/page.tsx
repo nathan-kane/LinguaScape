@@ -1,9 +1,12 @@
+"use client";
+
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Zap, BookOpen, PlusCircle, ListChecks, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react"; // Import useState
 
 // Placeholder for flashcard component
 const FlashcardPlaceholder = ({ front, back, showBack }: { front: string, back: string, showBack: boolean }) => (
@@ -25,9 +28,11 @@ const FlashcardPlaceholder = ({ front, back, showBack }: { front: string, back: 
 
 
 export default function VocabularyPage() {
-  // Placeholder state for flashcard flip
-  // In a real app, this would be managed with useState and event handlers
-  const showBack = false; // Set to true to see the back
+  const [showBack, setShowBack] = useState(false); // Manage flip state
+
+  const handleCardClick = () => {
+    setShowBack(!showBack);
+  };
 
   const stats = [
     { label: "Words to Review", value: 25, icon: <ListChecks className="text-primary" /> },
@@ -54,7 +59,9 @@ export default function VocabularyPage() {
 
         {/* Main Flashcard Review Area */}
         <section className="flex flex-col items-center gap-8 py-8">
-          <FlashcardPlaceholder front="Hola" back="Hello" showBack={showBack} />
+          <div onClick={handleCardClick}> {/* Add click handler to toggle */}
+            <FlashcardPlaceholder front="Hola" back="Hello" showBack={showBack} />
+          </div>
           <div className="flex gap-4 mt-4">
             <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10 w-28">Again</Button>
             <Button variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 w-28">Hard</Button>
