@@ -211,6 +211,44 @@ export default function DailySessionPage() {
     }
   };
 
+  // Moved fetchMiniStory related definitions before setupRecognitionQuestion
+  const fetchMiniStoryCallback = useCallback(async () => {
+    if (!nativeLanguage || dailyWords.length === 0) {
+        setMiniStoryText("No words available to create a story, or native language not set. Try starting a new lesson!");
+        setTranslatedMiniStoryText("");
+        setIsLoadingStory(false);
+        return;
+    }
+    setIsLoadingStory(true);
+    setMiniStoryText(null);
+    setTranslatedMiniStoryText(null);
+    try {
+      const input: MiniStoryInput = {
+        targetLanguage: selectedLanguage.name,
+        nativeLanguageName: nativeLanguage.name,
+        learningMode: selectedMode.name, 
+        dailyWords: dailyWords.map(w => w.word),
+      };
+      const result = await generateMiniStory(input);
+      setMiniStoryText(result.storyText);
+      setTranslatedMiniStoryText(result.translatedStoryText);
+    } catch (error) {
+      console.error("Error generating mini story:", error);
+      toast({
+        title: "Story Generation Failed",
+        description: "Could not create a mini-story. Using a default message.",
+        variant: "destructive",
+      });
+      setMiniStoryText(`Apologies, I couldn't create a story with ${selectedLanguage.name} words for the ${selectedMode.name} mode right now. Please try to use your new words in the chat!`);
+      setTranslatedMiniStoryText(`Translation is unavailable due to story generation error.`);
+    } finally {
+      setIsLoadingStory(false);
+    }
+  }, [dailyWords, selectedLanguage, nativeLanguage, selectedMode, toast]);
+
+  const fetchMiniStory = fetchMiniStoryCallback;
+
+
   const setupRecognitionQuestion = useCallback((index: number) => {
     if (index >= dailyWords.length || dailyWords.length === 0) {
       setPracticeStage('story'); 
@@ -271,43 +309,6 @@ export default function DailySessionPage() {
       fetchMiniStory(); 
     }
   };
-  
-  const fetchMiniStoryCallback = useCallback(async () => {
-    if (dailyWords.length === 0) {
-        setMiniStoryText("No words available to create a story. Try starting a new lesson!");
-        setTranslatedMiniStoryText("");
-        setIsLoadingStory(false);
-        return;
-    }
-    setIsLoadingStory(true);
-    setMiniStoryText(null);
-    setTranslatedMiniStoryText(null);
-    try {
-      const input: MiniStoryInput = {
-        targetLanguage: selectedLanguage.name,
-        nativeLanguageName: nativeLanguage.name,
-        learningMode: selectedMode.name, 
-        dailyWords: dailyWords.map(w => w.word),
-      };
-      const result = await generateMiniStory(input);
-      setMiniStoryText(result.storyText);
-      setTranslatedMiniStoryText(result.translatedStoryText);
-    } catch (error) {
-      console.error("Error generating mini story:", error);
-      toast({
-        title: "Story Generation Failed",
-        description: "Could not create a mini-story. Using a default message.",
-        variant: "destructive",
-      });
-      setMiniStoryText(`Apologies, I couldn't create a story with ${selectedLanguage.name} words for the ${selectedMode.name} mode right now. Please try to use your new words in the chat!`);
-      setTranslatedMiniStoryText(`Translation is unavailable due to story generation error.`);
-    } finally {
-      setIsLoadingStory(false);
-    }
-  }, [dailyWords, selectedLanguage, nativeLanguage, selectedMode, toast]);
-
-  // Expose fetchMiniStory for use in setupRecognitionQuestion and handleNextRecognitionItem
-  const fetchMiniStory = fetchMiniStoryCallback;
 
 
   if (isLoadingPreferences || isLoadingLesson) {
@@ -476,7 +477,7 @@ export default function DailySessionPage() {
                       <Separator className="my-3"/>
                       <div className="space-y-1">
                          <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                           <Languages className="h-4 w-4" /> Translation ({nativeLanguage.name}):
+                           <Languages className="h-4 w-4" /> Translation ({nativeLanguage?.name || 'your language'}):
                          </h4>
                          <ScrollArea className="h-32 p-3 bg-muted/30 rounded-md border border-dashed">
                             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{translatedMiniStoryText}</p>
@@ -525,3 +526,4 @@ export default function DailySessionPage() {
     </AuthenticatedLayout>
   );
 }
+
