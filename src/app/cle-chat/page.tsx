@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Send, User, Bot } from "lucide-react"; // Removed unused icons like Zap, AlertCircle, Mic
+import { MessageSquare, Send, User, Bot, Languages, Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useLearning } from '@/context/LearningContext';
 import type { ChatMessage } from '@/lib/types';
 import { getCleConversationResponse, CleConversationInput } from '@/ai/flows/cle-conversation-flow';
+import { translateText, TranslateTextInput } from '@/ai/flows/translate-text-flow';
 import { useToast } from '@/hooks/use-toast';
 
 const getInitialAiGreeting = (languageName: string, scene: string, wordsCount: number): string => {
@@ -28,18 +30,20 @@ const getInitialAiGreeting = (languageName: string, scene: string, wordsCount: n
   }
 };
 
-
-// Helper component to access searchParams within Suspense boundary
 function ChatContent() {
   const searchParams = useSearchParams();
-  const { selectedLanguage, selectedMode } = useLearning();
+  const { selectedLanguage, selectedMode, nativeLanguage } = useLearning();
   const { toast } = useToast();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isLoadingAiResponse, setIsLoadingAiResponse] = useState(false);
   const [targetWords, setTargetWords] = useState<string[]>([]);
-  const [currentScene, setCurrentScene] = useState("a local market"); // Example scene
+  const [currentScene, setCurrentScene] = useState("a local market"); 
+
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [activeTranslationId, setActiveTranslationId] = useState<string | null>(null);
+  const [loadingTranslationId, setLoadingTranslationId] = useState<string | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -51,19 +55,44 @@ function ChatContent() {
       setTargetWords(currentTargetWords);
     }
     
-    // Initial greeting from AI, now dynamic
     const greetingText = getInitialAiGreeting(selectedLanguage.name, currentScene, currentTargetWords.length);
     setMessages([
       { id: Date.now().toString(), speaker: 'ai', text: greetingText, timestamp: Date.now() }
     ]);
-  }, [searchParams, currentScene, selectedLanguage]); // Added selectedLanguage dependency
+  }, [searchParams, currentScene, selectedLanguage]);
 
   useEffect(() => {
-    // Scroll to bottom when new messages are added
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
+
+  const handleRequestTranslation = async (messageId: string, textToTranslate: string, sourceLanguageName: string) => {
+    if (translations[messageId]) {
+      // Translation already exists, Popover will show it.
+      return;
+    }
+    setLoadingTranslationId(messageId);
+    try {
+      const input: TranslateTextInput = {
+        textToTranslate,
+        sourceLanguageName,
+        targetLanguageName: nativeLanguage.name,
+      };
+      const result = await translateText(input);
+      setTranslations(prev => ({ ...prev, [messageId]: result.translatedText }));
+    } catch (error) {
+      console.error("Error translating text:", error);
+      toast({
+        title: "Translation Error",
+        description: `Could not translate this message to ${nativeLanguage.name}.`,
+        variant: "destructive",
+      });
+      setTranslations(prev => ({ ...prev, [messageId]: `Translation to ${nativeLanguage.name} failed.` }));
+    } finally {
+      setLoadingTranslationId(null);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!userInput.trim()) return;
@@ -79,7 +108,6 @@ function ChatContent() {
     setIsLoadingAiResponse(true);
 
     try {
-      // Prepare chat history for AI, ensuring it's just text and speaker
       const chatHistoryForAI = messages.map(m => ({ speaker: m.speaker, text: m.text }));
       
       const input: CleConversationInput = {
@@ -88,7 +116,6 @@ function ChatContent() {
         todaysWords: targetWords,
         userMessage: newUserMessage.text,
         chatHistory: chatHistoryForAI,
-        // userId: authUser.uid - if needed by flow for personalization
       };
 
       const aiResponse = await getCleConversationResponse(input);
@@ -130,7 +157,6 @@ function ChatContent() {
     }
   };
 
-
   return (
     <div className="space-y-8">
       <section>
@@ -151,6 +177,7 @@ function ChatContent() {
           {targetWords.length > 0 && (
             <CardDescription>Try to use these words: <span className="font-semibold text-accent">{targetWords.join(', ')}</span></CardDescription>
           )}
+           <CardDescription className="text-xs">Click the <Languages className="inline h-3 w-3 text-muted-foreground"/> icon on AI messages for translation to {nativeLanguage.name}.</CardDescription>
         </CardHeader>
         <CardContent className="flex-1 overflow-hidden p-0">
           <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
@@ -172,6 +199,37 @@ function ChatContent() {
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                   </div>
+                  {msg.speaker === 'ai' && (
+                    <Popover onOpenChange={(open) => {
+                      if (open) {
+                        setActiveTranslationId(msg.id);
+                        handleRequestTranslation(msg.id, msg.text, selectedLanguage.name);
+                      } else {
+                        setActiveTranslationId(null);
+                      }
+                    }}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 p-1 shrink-0 ml-1 rounded-full hover:bg-primary/20">
+                          <Languages className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                          <span className="sr-only">Translate</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto max-w-xs sm:max-w-sm md:max-w-md p-3" side="top" align="start">
+                        {loadingTranslationId === msg.id && (
+                          <div className="flex items-center justify-center py-2">
+                            <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                            <span className="text-sm text-muted-foreground">Translating to {nativeLanguage.name}...</span>
+                          </div>
+                        )}
+                        {loadingTranslationId !== msg.id && translations[msg.id] && (
+                           <p className="text-sm text-popover-foreground">{translations[msg.id]}</p>
+                        )}
+                         {loadingTranslationId !== msg.id && !translations[msg.id] && (
+                           <p className="text-sm text-muted-foreground italic">Click to translate message.</p>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   {msg.speaker === 'user' && <User className="h-8 w-8 text-muted-foreground shrink-0 mb-1" />}
                 </div>
               ))}
@@ -208,7 +266,6 @@ function ChatContent() {
   );
 }
 
-
 export default function CleChatPage() {
   return (
     <AuthenticatedLayout>
@@ -218,4 +275,3 @@ export default function CleChatPage() {
     </AuthenticatedLayout>
   );
 }
-
