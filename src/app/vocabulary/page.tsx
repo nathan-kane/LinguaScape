@@ -124,10 +124,6 @@ const getVocabularySessionWords = (languageCode: string, modeId: string): DailyW
         if (word.word === "Viajar" && languageCode === 'es') return {...word, exampleSentence: "Quiero viajar a España este verano.", dataAiHint: "spain travel"};
         if (word.word === "Voyager" && languageCode === 'fr') return {...word, exampleSentence: "Nous allons voyager en France bientôt.", dataAiHint: "france travel"};
         if (word.word === "Подорожувати" && languageCode === 'ua') return {...word, exampleSentence: "Я мрію подорожувати по Карпатах.", dataAiHint: "carpathians travel"};
-        // Example of adding a new word specifically for travel mode, if it wasn't in baseWords
-        // if (languageCode === 'es' && !baseWords.find(bw => bw.word === "Hotel")) { 
-        //    return [...baseWords, { wordBankId: "es_v_hotel_travel", word: "Hotel", translation: "Hotel", ...commonProps, exampleSentence: "Necesitamos reservar un hotel cerca del aeropuerto.", wordType: "noun", dataAiHint: "airport hotel" }];
-        // }
         return word;
     });
   }
@@ -148,7 +144,7 @@ export default function VocabularyPage() {
   const loadNewSessionWords = useCallback(() => {
     if (!isLoadingPreferences && selectedLanguage && selectedMode) {
       setIsLoadingSession(true);
-      setTimeout(() => { // Simulate async fetch for a better UX
+      setTimeout(() => { 
         const allWordsForContext = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
         setTotalWordsInCurrentPool(allWordsForContext.length);
         const shuffledWords = shuffleArray(allWordsForContext);
@@ -156,7 +152,7 @@ export default function VocabularyPage() {
         setCurrentCardIndex(0);
         setShowBack(false);
         setIsLoadingSession(false);
-      }, 300); // Short delay
+      }, 300); 
     }
   }, [selectedLanguage, selectedMode, isLoadingPreferences]);
 
@@ -174,13 +170,11 @@ export default function VocabularyPage() {
     if (sessionWords.length > 0) {
       const nextIndex = (currentCardIndex + 1);
       if (nextIndex >= sessionWords.length) {
-        // Reached end of current X-word session, load a new set
         loadNewSessionWords(); 
       } else {
         setCurrentCardIndex(nextIndex);
       }
       setShowBack(false);
-      // In a full SRS, srsRating would be used to update word progress and scheduling
       if (srsRating) {
         console.log(`Card rated as: ${srsRating}. Next review would be adjusted.`);
       } else {
@@ -194,7 +188,7 @@ export default function VocabularyPage() {
   const stats = [
     { label: "Words in Session", icon: <ListChecks className="text-primary" /> },
     { label: "New Words Potential", icon: <PlusCircle className="text-primary" /> }, 
-    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, // Placeholder value
+    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, 
   ];
 
   if (isLoadingPreferences || isLoadingSession) {
