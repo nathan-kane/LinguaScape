@@ -18,10 +18,11 @@ interface LanguageSelectorProps {
   selectedLanguage: Language;
   onLanguageChange: (language: Language) => void;
   className?: string;
+  disabled?: boolean;
 }
 
 export function LanguageSelector({ selectedLanguage, onLanguageChange, className }: LanguageSelectorProps) {
-  const handleValueChange = (value: string) => {
+  const handleValueChange = (value: string): void => {
     const newLanguage = SUPPORTED_LANGUAGES.find(lang => lang.code === value);
     if (newLanguage) {
       onLanguageChange(newLanguage);

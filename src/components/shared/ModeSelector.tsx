@@ -17,9 +17,10 @@ interface ModeSelectorProps {
   selectedMode: LearningMode;
   onModeChange: (mode: LearningMode) => void;
   className?: string;
+  disabled?: boolean;
 }
 
-export function ModeSelector({ selectedMode, onModeChange, className }: ModeSelectorProps) {
+export function ModeSelector({ selectedMode, onModeChange, className, disabled }: ModeSelectorProps) {
   const handleValueChange = (value: string) => {
     const newMode = LEARNING_MODES.find(mode => mode.id === value);
     if (newMode) {
@@ -31,6 +32,7 @@ export function ModeSelector({ selectedMode, onModeChange, className }: ModeSele
     <Select
       value={selectedMode.id}
       onValueChange={handleValueChange}
+      disabled={disabled}
     >
       <SelectTrigger 
         className={cn("w-[200px] justify-between", className)}

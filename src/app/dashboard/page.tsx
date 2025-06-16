@@ -37,16 +37,20 @@ export default function DashboardPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const userDocRef = doc(db, "users", user.uid);
+        let userData; // Declare userData here
         try {
-          const docSnap = await getDoc(userDocRef);
+          const docSnap = await getDoc(userDocRef) as any; // Cast to any for easier access, consider a proper type later
           if (docSnap.exists()) {
-            const userData = docSnap.data();
-            if (userData && userData.displayName) {
+            userData = docSnap.data();
+            // Safely access properties from userData
+            if (userData?.displayName) {
               setUserName(userData.displayName);
             } else if (user.displayName) {
               setUserName(user.displayName);
             }
           } else if (user.displayName) {
+            // If docSnap doesn't exist, still try to use auth display name
+            userData = {}; // Initialize userData as an empty object
             setUserName(user.displayName);
           }
           setCurrentStreak(userData?.currentStreak || 0);
@@ -93,18 +97,18 @@ export default function DashboardPage() {
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="shadow-lg bg-card">
+          <Card className="shadow-lg bg-card w-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
-              <Flame className="h-5 w-5 text-primary" />
+              <Flame className="h-5 w-5 text-primary"/>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{currentStreak} days</div>
               <p className="text-xs text-muted-foreground">Keep it up! Consistency is key.</p>
             </CardContent>
           </Card>
-          <Card className="shadow-lg bg-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+ <Card className="shadow-lg bg-card w-full">
+ <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Words Learned</CardTitle>
               <BookOpen className="h-5 w-5 text-primary" />
             </CardHeader>
@@ -113,11 +117,11 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground">Expanding your vocabulary daily.</p>
             </CardContent>
           </Card>
-          <Card className="shadow-lg bg-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+ <Card className="shadow-lg bg-card w-full">
+ <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Lessons Today</CardTitle>
               <Activity className="h-5 w-5 text-primary" />
-            </CardHeader>
+ </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{lessonsCompletedToday} lessons</div>
               <p className="text-xs text-muted-foreground">Great progress for today!</p>
@@ -127,7 +131,7 @@ export default function DashboardPage() {
 
         <section>
           <h2 className="text-2xl font-headline font-semibold text-foreground mb-4">Quick Access</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {quickLinks.map((link) => (
               <Card key={link.title} className="shadow-md hover:shadow-lg transition-shadow duration-300 bg-card">
                 <CardHeader>
@@ -152,13 +156,13 @@ export default function DashboardPage() {
           <Card className="shadow-lg bg-card">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row items-center gap-6">
-                <Image 
-                  src="https://placehold.co/600x400.png" 
-                  alt="Learning Path Illustration" 
-                  width={250} 
-                  height={150} 
+                <Image
+                  src="https://placehold.co/600x400.png"
+                  alt="Learning Path Illustration"
+                  width={250}
+                  height={150}
                   className="rounded-lg object-cover"
-                  data-ai-hint="learning journey" 
+                  data-ai-hint="learning journey"
                 />
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-primary mb-2">Next Up: Mastering Past Tense</h3>
@@ -178,13 +182,13 @@ export default function DashboardPage() {
             <Card className="shadow-lg bg-card">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-xl font-headline"><Award className="h-6 w-6 text-primary"/>Achievements</CardTitle>
-                    <CardDescription>View your unlocked badges and milestones.</CardDescription>
+                    <CardDescription>View your unlocked badges and milestones.</CardDescription>ß
                 </CardHeader>
                 <CardContent>
-                    <div className="flex space-x-3 overflow-x-auto pb-2">
+                  <div className="flex flex-wrap gap-4 justify-center md:justify-start pb-2">
                         {[...Array(5)].map((_, i) => (
-                             <div key={i} className="flex flex-col items-center p-3 bg-secondary rounded-lg w-24 text-center" data-ai-hint="badge achievement">
-                                <Image src={`https://placehold.co/80x80.png`} alt={`Badge ${i+1}`} width={48} height={48} className="rounded-full mb-1" />
+                          <div key={i} className="flex flex-col items-center p-3 bg-secondary rounded-lg w-24 text-center flex-shrink-0" data-ai-hint="badge achievement">
+ <Image src={`https://placehold.co/80x80.png`} alt={`Badge ${i+1}`} width={48} height={48} className="rounded-full mb-1" unoptimized />
                                 <span className="text-xs font-medium text-secondary-foreground">Badge {i+1}</span>
                              </div>
                         ))}
