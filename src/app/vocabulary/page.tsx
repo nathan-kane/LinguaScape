@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Zap, BookOpen, PlusCircle, ListChecks, HelpCircle, ChevronRight, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image"; // Keep if DailyWordItem has imageUrl
+import Image from "next/image"; 
 import { useState, useEffect, useCallback } from "react"; 
 import { useLearning } from '@/context/LearningContext';
 import type { DailyWordItem } from '@/lib/types';
@@ -124,7 +124,10 @@ const getVocabularySessionWords = (languageCode: string, modeId: string): DailyW
         if (word.word === "Viajar" && languageCode === 'es') return {...word, exampleSentence: "Quiero viajar a España este verano.", dataAiHint: "spain travel"};
         if (word.word === "Voyager" && languageCode === 'fr') return {...word, exampleSentence: "Nous allons voyager en France bientôt.", dataAiHint: "france travel"};
         if (word.word === "Подорожувати" && languageCode === 'ua') return {...word, exampleSentence: "Я мрію подорожувати по Карпатах.", dataAiHint: "carpathians travel"};
-        if (word.word === "Hotel" && languageCode === 'es') return {...word, wordBankId: "es_v_hotel", translation: "Hotel", exampleSentence: "Necesitamos reservar un hotel cerca del aeropuerto.", dataAiHint: "airport hotel" }; // Example if adding word
+        // Example of adding a new word specifically for travel mode, if it wasn't in baseWords
+        // if (languageCode === 'es' && !baseWords.find(bw => bw.word === "Hotel")) { 
+        //    return [...baseWords, { wordBankId: "es_v_hotel_travel", word: "Hotel", translation: "Hotel", ...commonProps, exampleSentence: "Necesitamos reservar un hotel cerca del aeropuerto.", wordType: "noun", dataAiHint: "airport hotel" }];
+        // }
         return word;
     });
   }
@@ -140,12 +143,14 @@ export default function VocabularyPage() {
   const [sessionWords, setSessionWords] = useState<DailyWordItem[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [totalWordsInCurrentPool, setTotalWordsInCurrentPool] = useState(0);
 
   const loadNewSessionWords = useCallback(() => {
     if (!isLoadingPreferences && selectedLanguage && selectedMode) {
       setIsLoadingSession(true);
       setTimeout(() => {
         const allWordsForContext = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
+        setTotalWordsInCurrentPool(allWordsForContext.length);
         const shuffledWords = shuffleArray(allWordsForContext);
         setSessionWords(shuffledWords.slice(0, WORDS_PER_SESSION));
         setCurrentCardIndex(0);
@@ -169,20 +174,23 @@ export default function VocabularyPage() {
     if (sessionWords.length > 0) {
       const nextIndex = (currentCardIndex + 1);
       if (nextIndex >= sessionWords.length) {
+        // Reached end of current 7-word session, load a new set
         loadNewSessionWords(); 
       } else {
         setCurrentCardIndex(nextIndex);
       }
       setShowBack(false);
+      // In a full SRS, srsRating would be used to update word progress and scheduling
+      console.log(`Rated as: ${srsRating || 'skipped'}`); 
     }
   }, [sessionWords.length, currentCardIndex, loadNewSessionWords]);
 
   const currentWord = sessionWords[currentCardIndex];
 
   const stats = [
-    { label: "Words in Session", value: sessionWords.length, icon: <ListChecks className="text-primary" /> },
-    { label: "New Words Potential", value: 5, icon: <PlusCircle className="text-primary" /> }, 
-    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, 
+    { label: "Words in Session", icon: <ListChecks className="text-primary" /> },
+    { label: "New Words Potential", icon: <PlusCircle className="text-primary" /> }, 
+    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, // Placeholder value
   ];
 
   if (isLoadingPreferences || isLoadingSession) {
@@ -241,7 +249,7 @@ export default function VocabularyPage() {
                 Skip to Next Card <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
               
-              <p className="text-xs sm:text-sm text-muted-foreground text-center px-4">
+              <p className="text-xs sm:text-sm text-muted-foreground text-center px-4 max-w-md">
                 Card {currentCardIndex + 1} of {sessionWords.length}.
                 {!showBack && " Click the card to reveal the translation."}
                 {showBack && " Select how well you knew it, or click 'Skip to Next Card'."}
@@ -262,20 +270,31 @@ export default function VocabularyPage() {
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {stats.map(stat => (
-            <Card key={stat.label} className="shadow-lg bg-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-                {stat.icon}
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.label === "Words in Session" && sessionWords.length > 0 ? sessionWords.length : (stat.label === "Words in Session" ? WORDS_PER_SESSION : stat.value) }</div>
-                 <p className="text-xs text-muted-foreground">
-                  {stat.label === "Words in Session" && sessionWords.length > 0 ? `Currently reviewing ${currentCardIndex + 1} / ${sessionWords.length}` : " "}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+          {stats.map(stat => {
+            let displayValue: string | number = stat.value || 0;
+            if (stat.label === "Words in Session") {
+              displayValue = sessionWords.length;
+            } else if (stat.label === "New Words Potential") {
+              displayValue = Math.max(0, totalWordsInCurrentPool - sessionWords.length);
+            }
+
+            return (
+              <Card key={stat.label} className="shadow-lg bg-card">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
+                  {stat.icon}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{displayValue}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {stat.label === "Words in Session" && sessionWords.length > 0 ? `Currently reviewing ${currentCardIndex + 1} / ${sessionWords.length}` : 
+                     stat.label === "New Words Potential" ? "From current learning pool" :
+                     stat.label === "Words Mastered (Overall)" ? "Across all languages (est.)" : " "}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
