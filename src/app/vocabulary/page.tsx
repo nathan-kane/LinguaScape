@@ -11,9 +11,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useLearning } from '@/context/LearningContext';
 import type { DailyWordItem } from '@/lib/types';
 
-// Placeholder for flashcard component
+// Updated FlashcardPlaceholder component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example?: string, showBack: boolean }) => (
-  <div className="relative w-full max-w-5xl h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
+  <div className="relative w-full max-w-6xl mx-auto h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
       <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6 text-center">
@@ -144,15 +144,14 @@ export default function VocabularyPage() {
   const loadNewSessionWords = useCallback(() => {
     if (!isLoadingPreferences && selectedLanguage && selectedMode) {
       setIsLoadingSession(true);
-      setTimeout(() => { 
-        const allWordsForContext = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
-        setTotalWordsInCurrentPool(allWordsForContext.length);
-        const shuffledWords = shuffleArray(allWordsForContext);
-        setSessionWords(shuffledWords.slice(0, WORDS_PER_SESSION));
-        setCurrentCardIndex(0);
-        setShowBack(false);
-        setIsLoadingSession(false);
-      }, 300); 
+      // Simulate async fetch if needed, or directly call
+      const allWordsForContext = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
+      setTotalWordsInCurrentPool(allWordsForContext.length);
+      const shuffledWords = shuffleArray(allWordsForContext);
+      setSessionWords(shuffledWords.slice(0, WORDS_PER_SESSION));
+      setCurrentCardIndex(0);
+      setShowBack(false);
+      setIsLoadingSession(false);
     }
   }, [selectedLanguage, selectedMode, isLoadingPreferences]);
 
@@ -170,14 +169,12 @@ export default function VocabularyPage() {
     if (sessionWords.length > 0) {
       const nextIndex = (currentCardIndex + 1);
       if (nextIndex >= sessionWords.length) {
-        // End of current 7-word session, load new set.
         loadNewSessionWords(); 
       } else {
         setCurrentCardIndex(nextIndex);
       }
-      setShowBack(false); // Always reset to show front of new card
+      setShowBack(false);
       
-      // Placeholder for SRS logic
       if (srsRating) {
         console.log(`Word "${sessionWords[currentCardIndex].word}" rated as: ${srsRating}. Next review would be adjusted.`);
       } else {
@@ -189,10 +186,18 @@ export default function VocabularyPage() {
   const currentWord = sessionWords[currentCardIndex];
 
   const stats = [
-    { label: "Words in Session", icon: <ListChecks className="text-primary" /> },
-    { label: "New Words Potential", icon: <PlusCircle className="text-primary" /> }, 
-    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> },
+    { label: "Words in Session" },
+    { label: "New Words Potential" }, 
+    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, // Placeholder
   ];
+  
+  const getStatIcon = (label: string) => {
+    if (label === "Words in Session") return <ListChecks className="text-primary" />;
+    if (label === "New Words Potential") return <PlusCircle className="text-primary" />;
+    if (label === "Words Mastered (Overall)") return <Zap className="text-primary" />;
+    return <HelpCircle className="text-primary" />;
+  };
+
 
   if (isLoadingPreferences || isLoadingSession) {
     return (
@@ -225,7 +230,7 @@ export default function VocabularyPage() {
         <section className="flex flex-col items-center gap-6 py-8">
           {sessionWords.length > 0 && currentWord ? (
             <>
-              <div onClick={handleCardClick}> 
+              <div onClick={handleCardClick} className="w-full"> {/* Ensure this div is full width */}
                 <FlashcardPlaceholder 
                   front={currentWord.word} 
                   back={currentWord.translation} 
@@ -272,18 +277,20 @@ export default function VocabularyPage() {
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {stats.map(stat => {
-            let displayValue: string | number = stat.value || 0;
+            let displayValue: string | number = 0;
             if (stat.label === "Words in Session") {
               displayValue = sessionWords.length;
             } else if (stat.label === "New Words Potential") {
               displayValue = Math.max(0, totalWordsInCurrentPool - sessionWords.length);
+            } else if (stat.label === "Words Mastered (Overall)") {
+              displayValue = stat.value || 150; // Use placeholder if not defined differently
             }
 
             return (
               <Card key={stat.label} className="shadow-lg bg-card">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-                  {stat.icon}
+                  {getStatIcon(stat.label)}
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{displayValue}</div>
@@ -338,4 +345,3 @@ export default function VocabularyPage() {
     </AuthenticatedLayout>
   );
 }
-
