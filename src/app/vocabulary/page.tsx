@@ -6,14 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Zap, BookOpen, PlusCircle, ListChecks, HelpCircle, ChevronRight, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image"; 
+// import Image from "next/image"; // Not used in current component structure
 import { useState, useEffect, useCallback } from "react"; 
 import { useLearning } from '@/context/LearningContext';
 import type { DailyWordItem } from '@/lib/types';
 
 // Updated FlashcardPlaceholder component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example?: string, showBack: boolean }) => (
-  <div className="relative w-full max-w-5xl mx-auto h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
+  <div className="relative w-full max-w-6xl mx-auto h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
       <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6 text-center">
@@ -38,18 +38,16 @@ function shuffleArray<T>(array: T[]): T[] {
   return newArray;
 }
 
-// Ad-hoc type for local simulation within getVocabularySessionWords
-type LocalDailyWordItem = DailyWordItem & { _simulatedMastery?: boolean };
-
-const getVocabularySessionWords = (languageCode: string, modeId: string): LocalDailyWordItem[] => {
+// Removed _simulatedMastery from here as it's no longer used for the card
+const getVocabularySessionWords = (languageCode: string, modeId: string): DailyWordItem[] => {
   const commonProps = { imageUrl: "https://placehold.co/200x150.png", audioUrl: "#" };
-  let baseWords: LocalDailyWordItem[] = [];
+  let baseWords: DailyWordItem[] = [];
 
   if (languageCode === 'es') {
     baseWords = [
-      { wordBankId: "es_v1", word: "Amigo/Amiga", translation: "Friend", ...commonProps, exampleSentence: "Ella es mi amiga.", wordType: "noun", dataAiHint: "friends talking", _simulatedMastery: true },
-      { wordBankId: "es_v2", word: "Feliz", translation: "Happy", ...commonProps, exampleSentence: "Estoy feliz hoy.", wordType: "adjective", dataAiHint: "smiling face", _simulatedMastery: true },
-      { wordBankId: "es_v3", word: "Trabajar", translation: "To work", ...commonProps, exampleSentence: "Necesito trabajar mañana.", wordType: "verb", dataAiHint: "person working", _simulatedMastery: true },
+      { wordBankId: "es_v1", word: "Amigo/Amiga", translation: "Friend", ...commonProps, exampleSentence: "Ella es mi amiga.", wordType: "noun", dataAiHint: "friends talking" },
+      { wordBankId: "es_v2", word: "Feliz", translation: "Happy", ...commonProps, exampleSentence: "Estoy feliz hoy.", wordType: "adjective", dataAiHint: "smiling face" },
+      { wordBankId: "es_v3", word: "Trabajar", translation: "To work", ...commonProps, exampleSentence: "Necesito trabajar mañana.", wordType: "verb", dataAiHint: "person working" },
       { wordBankId: "es_v4", word: "Libro", translation: "Book", ...commonProps, exampleSentence: "Leo un libro interesante.", wordType: "noun", dataAiHint: "open book" },
       { wordBankId: "es_v5", word: "Ciudad", translation: "City", ...commonProps, exampleSentence: "Me gusta esta ciudad grande y hermosa.", wordType: "noun", dataAiHint: "city skyline" },
       { wordBankId: "es_v6", word: "Comida", translation: "Food", ...commonProps, exampleSentence: "La comida está deliciosa.", wordType: "noun", dataAiHint: "delicious food" },
@@ -65,8 +63,8 @@ const getVocabularySessionWords = (languageCode: string, modeId: string): LocalD
     ];
   } else if (languageCode === 'fr') {
     baseWords = [
-      { wordBankId: "fr_v1", word: "Ami/Amie", translation: "Friend", ...commonProps, exampleSentence: "Il est mon meilleur ami.", wordType: "noun", dataAiHint: "friends together", _simulatedMastery: true },
-      { wordBankId: "fr_v2", word: "Content/Contente", translation: "Happy", ...commonProps, exampleSentence: "Je suis très content de te voir.", wordType: "adjective", dataAiHint: "joyful expression", _simulatedMastery: true },
+      { wordBankId: "fr_v1", word: "Ami/Amie", translation: "Friend", ...commonProps, exampleSentence: "Il est mon meilleur ami.", wordType: "noun", dataAiHint: "friends together" },
+      { wordBankId: "fr_v2", word: "Content/Contente", translation: "Happy", ...commonProps, exampleSentence: "Je suis très content de te voir.", wordType: "adjective", dataAiHint: "joyful expression" },
       { wordBankId: "fr_v3", word: "Travailler", translation: "To work", ...commonProps, exampleSentence: "Je dois travailler dur pour réussir.", wordType: "verb", dataAiHint: "desk work" },
       { wordBankId: "fr_v4", word: "Livre", translation: "Book", ...commonProps, exampleSentence: "C'est un livre passionnant à lire.", wordType: "noun", dataAiHint: "stack books" },
       { wordBankId: "fr_v5", word: "Ville", translation: "City", ...commonProps, exampleSentence: "Paris est une ville magnifique.", wordType: "noun", dataAiHint: "paris city" },
@@ -83,8 +81,8 @@ const getVocabularySessionWords = (languageCode: string, modeId: string): LocalD
     ];
   } else if (languageCode === 'ua') {
      baseWords = [
-      { wordBankId: "ua_v1", word: "Друг/Подруга", translation: "Friend", ...commonProps, exampleSentence: "Він мій найкращий і найнадійніший друг.", wordType: "noun", dataAiHint: "best friends", _simulatedMastery: true },
-      { wordBankId: "ua_v2", word: "Щасливий/Щаслива", translation: "Happy", ...commonProps, exampleSentence: "Я дуже щаслива сьогодні ввечері.", wordType: "adjective", dataAiHint: "person happy", _simulatedMastery: true },
+      { wordBankId: "ua_v1", word: "Друг/Подруга", translation: "Friend", ...commonProps, exampleSentence: "Він мій найкращий і найнадійніший друг.", wordType: "noun", dataAiHint: "best friends" },
+      { wordBankId: "ua_v2", word: "Щасливий/Щаслива", translation: "Happy", ...commonProps, exampleSentence: "Я дуже щаслива сьогодні ввечері.", wordType: "adjective", dataAiHint: "person happy" },
       { wordBankId: "ua_v3", word: "Працювати", translation: "To work", ...commonProps, exampleSentence: "Мені подобається працювати в команді.", wordType: "verb", dataAiHint: "office work" },
       { wordBankId: "ua_v4", word: "Книга", translation: "Book", ...commonProps, exampleSentence: "Ця книга дуже цікава та інформативна.", wordType: "noun", dataAiHint: "interesting book" },
       { wordBankId: "ua_v5", word: "Місто", translation: "City", ...commonProps, exampleSentence: "Київ - велике і старовинне місто.", wordType: "noun", dataAiHint: "kyiv city" },
@@ -101,8 +99,8 @@ const getVocabularySessionWords = (languageCode: string, modeId: string): LocalD
     ];
   } else { // Default (English or generic)
     baseWords = [
-      { wordBankId: "en_v1", word: "Example", translation: "Ejemplo (Spanish)", ...commonProps, exampleSentence: "This is a very good example for everyone.", wordType: "noun", dataAiHint: "example sign", _simulatedMastery: true },
-      { wordBankId: "en_v2", word: "Learn", translation: "Aprender (Spanish)", ...commonProps, exampleSentence: "I want to learn many new things.", wordType: "verb", dataAiHint: "student learning", _simulatedMastery: true },
+      { wordBankId: "en_v1", word: "Example", translation: "Ejemplo (Spanish)", ...commonProps, exampleSentence: "This is a very good example for everyone.", wordType: "noun", dataAiHint: "example sign" },
+      { wordBankId: "en_v2", word: "Learn", translation: "Aprender (Spanish)", ...commonProps, exampleSentence: "I want to learn many new things.", wordType: "verb", dataAiHint: "student learning" },
       { wordBankId: "en_v3", word: "Quick", translation: "Rápido (Spanish)", ...commonProps, exampleSentence: "Be quick and efficient!", wordType: "adjective", dataAiHint: "running fast" },
       { wordBankId: "en_v4", word: "Vocabulary", translation: "Vocabulario (Spanish)", ...commonProps, exampleSentence: "Expand your vocabulary daily.", wordType: "noun", dataAiHint: "dictionary words" },
       { wordBankId: "en_v5", word: "Practice", translation: "Práctica (Spanish)", ...commonProps, exampleSentence: "Consistent practice makes perfect.", wordType: "verb", dataAiHint: "person practicing" },
@@ -143,7 +141,7 @@ export default function VocabularyPage() {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [totalWordsInCurrentPool, setTotalWordsInCurrentPool] = useState(0);
-  const [simulatedMasteredWordCount, setSimulatedMasteredWordCount] = useState(0);
+  const [masteredWordIds, setMasteredWordIds] = useState<Set<string>>(new Set());
 
 
   const loadNewSessionWords = useCallback(() => {
@@ -152,9 +150,7 @@ export default function VocabularyPage() {
       const allWordsForContext = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
       
       setTotalWordsInCurrentPool(allWordsForContext.length);
-      
-      const masteredCount = allWordsForContext.filter(word => word._simulatedMastery).length;
-      setSimulatedMasteredWordCount(masteredCount);
+      setMasteredWordIds(new Set()); // Reset session mastery count
 
       const shuffledWords = shuffleArray(allWordsForContext);
       setSessionWords(shuffledWords.slice(0, WORDS_PER_SESSION));
@@ -176,38 +172,42 @@ export default function VocabularyPage() {
   };
 
   const handleNextCard = useCallback((srsRating?: string) => {
-    if (sessionWords.length > 0) {
-      const nextIndex = (currentCardIndex + 1);
-      if (nextIndex >= sessionWords.length) {
-        // Reached end of current session, load new words
-        loadNewSessionWords(); 
-      } else {
-        setCurrentCardIndex(nextIndex);
-      }
-      setShowBack(false); // Always flip to front for next card
-      
-      // Placeholder for SRS logic integration
-      if (srsRating) {
-        console.log(`Word "${sessionWords[currentCardIndex].word}" rated as: ${srsRating}. Next review would be adjusted.`);
-      } else {
-        // This case handles "Skip to Next Card"
-        console.log(`Word "${sessionWords[currentCardIndex].word}" skipped.`);
-      }
+    if (sessionWords.length === 0) return;
+
+    const currentWordBankId = sessionWords[currentCardIndex].wordBankId;
+
+    if (srsRating === 'easy') {
+      setMasteredWordIds(prev => new Set(prev).add(currentWordBankId));
     }
-  }, [sessionWords, currentCardIndex, loadNewSessionWords]); // Added loadNewSessionWords
+      
+    const nextIndex = (currentCardIndex + 1);
+    if (nextIndex >= sessionWords.length) {
+      // Reached end of current session, load new words and reset mastery for the new session
+      loadNewSessionWords(); 
+    } else {
+      setCurrentCardIndex(nextIndex);
+    }
+    setShowBack(false); // Always flip to front for next card
+    
+    if (srsRating) {
+      console.log(`Word "${sessionWords[currentCardIndex].word}" (ID: ${currentWordBankId}) rated as: ${srsRating}.`);
+    } else {
+      console.log(`Word "${sessionWords[currentCardIndex].word}" (ID: ${currentWordBankId}) skipped.`);
+    }
+  }, [sessionWords, currentCardIndex, loadNewSessionWords]);
 
   const currentWord = sessionWords[currentCardIndex];
 
   const stats = [
     { label: "Words in Session" },
     { label: "New Words Potential" }, 
-    { label: "Words Mastered (Simulated)" }, // Updated label
+    { label: "Words Mastered (Session)" },
   ];
   
   const getStatIcon = (label: string) => {
     if (label === "Words in Session") return <ListChecks className="text-primary" />;
     if (label === "New Words Potential") return <PlusCircle className="text-primary" />;
-    if (label === "Words Mastered (Simulated)") return <Zap className="text-primary" />;
+    if (label === "Words Mastered (Session)") return <Zap className="text-primary" />;
     return <HelpCircle className="text-primary" />;
   };
 
@@ -299,9 +299,9 @@ export default function VocabularyPage() {
             } else if (stat.label === "New Words Potential") {
               displayValue = Math.max(0, totalWordsInCurrentPool - sessionWords.length);
               subText = "From current language pool";
-            } else if (stat.label === "Words Mastered (Simulated)") {
-              displayValue = simulatedMasteredWordCount; 
-              subText = "Est. mastered from current language pool";
+            } else if (stat.label === "Words Mastered (Session)") {
+              displayValue = masteredWordIds.size; 
+              subText = "Words marked 'Easy' in this session";
             }
 
             return (
