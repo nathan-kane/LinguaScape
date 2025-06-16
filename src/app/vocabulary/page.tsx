@@ -13,7 +13,7 @@ import type { DailyWordItem } from '@/lib/types';
 
 // Placeholder for flashcard component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example?: string, showBack: boolean }) => (
-  <div className="relative w-full max-w-3xl h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
+  <div className="relative w-full max-w-4xl h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
       <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6 text-center">
@@ -176,19 +176,22 @@ export default function VocabularyPage() {
       }
       setShowBack(false);
       if (srsRating) {
-        console.log(`Card rated as: ${srsRating}. Next review would be adjusted.`);
+        // Placeholder for SRS logic: In a real app, you'd use this rating
+        // to update the word's review schedule in a database.
+        // For example: updateWordSRS(sessionWords[currentCardIndex].wordBankId, srsRating);
+        console.log(`Word "${sessionWords[currentCardIndex].word}" rated as: ${srsRating}. Next review would be adjusted.`);
       } else {
-        console.log('Card skipped.');
+        console.log(`Word "${sessionWords[currentCardIndex].word}" skipped.`);
       }
     }
-  }, [sessionWords.length, currentCardIndex, loadNewSessionWords]);
+  }, [sessionWords, currentCardIndex, loadNewSessionWords]); // Added sessionWords to dependency array
 
   const currentWord = sessionWords[currentCardIndex];
 
   const stats = [
     { label: "Words in Session", icon: <ListChecks className="text-primary" /> },
     { label: "New Words Potential", icon: <PlusCircle className="text-primary" /> }, 
-    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, 
+    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, // This remains a placeholder
   ];
 
   if (isLoadingPreferences || isLoadingSession) {
