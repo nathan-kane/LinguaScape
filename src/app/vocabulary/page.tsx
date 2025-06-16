@@ -13,7 +13,7 @@ import type { DailyWordItem } from '@/lib/types';
 
 // Placeholder for flashcard component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example?: string, showBack: boolean }) => (
-  <div className="relative w-full max-w-4xl h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
+  <div className="relative w-full max-w-5xl h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
       <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6 text-center">
@@ -170,28 +170,28 @@ export default function VocabularyPage() {
     if (sessionWords.length > 0) {
       const nextIndex = (currentCardIndex + 1);
       if (nextIndex >= sessionWords.length) {
+        // End of current 7-word session, load new set.
         loadNewSessionWords(); 
       } else {
         setCurrentCardIndex(nextIndex);
       }
-      setShowBack(false);
+      setShowBack(false); // Always reset to show front of new card
+      
+      // Placeholder for SRS logic
       if (srsRating) {
-        // Placeholder for SRS logic: In a real app, you'd use this rating
-        // to update the word's review schedule in a database.
-        // For example: updateWordSRS(sessionWords[currentCardIndex].wordBankId, srsRating);
         console.log(`Word "${sessionWords[currentCardIndex].word}" rated as: ${srsRating}. Next review would be adjusted.`);
       } else {
         console.log(`Word "${sessionWords[currentCardIndex].word}" skipped.`);
       }
     }
-  }, [sessionWords, currentCardIndex, loadNewSessionWords]); // Added sessionWords to dependency array
+  }, [sessionWords, currentCardIndex, loadNewSessionWords]); 
 
   const currentWord = sessionWords[currentCardIndex];
 
   const stats = [
     { label: "Words in Session", icon: <ListChecks className="text-primary" /> },
     { label: "New Words Potential", icon: <PlusCircle className="text-primary" /> }, 
-    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> }, // This remains a placeholder
+    { label: "Words Mastered (Overall)", value: 150, icon: <Zap className="text-primary" /> },
   ];
 
   if (isLoadingPreferences || isLoadingSession) {
@@ -288,7 +288,7 @@ export default function VocabularyPage() {
                 <CardContent>
                   <div className="text-2xl font-bold">{displayValue}</div>
                   <p className="text-xs text-muted-foreground">
-                    {stat.label === "Words in Session" && sessionWords.length > 0 ? `Currently reviewing ${currentCardIndex + 1} / ${sessionWords.length}` : 
+                    {stat.label === "Words in Session" && sessionWords.length > 0 ? `Currently reviewing ${Math.min(currentCardIndex + 1, sessionWords.length)} / ${sessionWords.length}` : 
                      stat.label === "New Words Potential" ? "From current learning pool" :
                      stat.label === "Words Mastered (Overall)" ? "Across all languages (est.)" : " "}
                   </p>
