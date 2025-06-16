@@ -13,7 +13,7 @@ import type { DailyWordItem } from '@/lib/types';
 
 // Placeholder for flashcard component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example?: string, showBack: boolean }) => (
-  <div className="relative w-full max-w-2xl h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
+  <div className="relative w-full max-w-3xl h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
       {/* Front of card */}
       <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6 text-center">
@@ -148,7 +148,7 @@ export default function VocabularyPage() {
   const loadNewSessionWords = useCallback(() => {
     if (!isLoadingPreferences && selectedLanguage && selectedMode) {
       setIsLoadingSession(true);
-      setTimeout(() => {
+      setTimeout(() => { // Simulate async fetch for a better UX
         const allWordsForContext = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
         setTotalWordsInCurrentPool(allWordsForContext.length);
         const shuffledWords = shuffleArray(allWordsForContext);
@@ -156,7 +156,7 @@ export default function VocabularyPage() {
         setCurrentCardIndex(0);
         setShowBack(false);
         setIsLoadingSession(false);
-      }, 300);
+      }, 300); // Short delay
     }
   }, [selectedLanguage, selectedMode, isLoadingPreferences]);
 
@@ -174,14 +174,18 @@ export default function VocabularyPage() {
     if (sessionWords.length > 0) {
       const nextIndex = (currentCardIndex + 1);
       if (nextIndex >= sessionWords.length) {
-        // Reached end of current 7-word session, load a new set
+        // Reached end of current X-word session, load a new set
         loadNewSessionWords(); 
       } else {
         setCurrentCardIndex(nextIndex);
       }
       setShowBack(false);
       // In a full SRS, srsRating would be used to update word progress and scheduling
-      console.log(`Rated as: ${srsRating || 'skipped'}`); 
+      if (srsRating) {
+        console.log(`Card rated as: ${srsRating}. Next review would be adjusted.`);
+      } else {
+        console.log('Card skipped.');
+      }
     }
   }, [sessionWords.length, currentCardIndex, loadNewSessionWords]);
 
