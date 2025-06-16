@@ -23,9 +23,9 @@ const quickLinks = [
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState<string>("Learner");
-  const [currentStreak, setCurrentStreak] = useState(15); // Placeholder
-  const [wordsLearned, setWordsLearned] = useState(250); // Placeholder
-  const [lessonsCompletedToday, setLessonsCompletedToday] = useState(3); // Placeholder
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [wordsLearned, setWordsLearned] = useState(0);
+  const [lessonsCompletedToday, setLessonsCompletedToday] = useState(0);
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>(DEFAULT_LANGUAGE);
   const [currentMode, setCurrentMode] = useState<LearningMode>(DEFAULT_MODE);
@@ -49,7 +49,9 @@ export default function DashboardPage() {
           } else if (user.displayName) {
             setUserName(user.displayName);
           }
-          // Future: fetch streak, wordsLearned etc.
+          setCurrentStreak(userData?.currentStreak || 0);
+          setWordsLearned(userData?.wordsLearned || 0);
+          setLessonsCompletedToday(userData?.lessonsCompletedToday || 0);
         } catch (error) {
           console.error("Error fetching user data for dashboard:", error);
           // Use auth display name as a fallback if Firestore fetch fails
