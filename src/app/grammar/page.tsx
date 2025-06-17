@@ -10,16 +10,18 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input"; // Added Input import
-import { useLearning } from '@/context/LearningContext'; // For language context
+import { Input } from "@/components/ui/input";
+import { useLearning } from '@/context/LearningContext';
 
-// Placeholder data for grammar questions - could be expanded or fetched
+// Placeholder data for grammar questions
+// Native language prompts are in English for this placeholder data.
 const grammarQuestionsData = {
-  en: [
+  en: [ // Assuming English is the target language, native prompt might be for context or specific instruction
     {
       id: "en1",
       type: "multiple-choice",
-      questionText: "Which sentence uses the correct article: '___ apple a day keeps the doctor away.'?",
+      nativeLanguagePrompt: "Instruction: Choose the correct article.",
+      questionText: "'___ apple a day keeps the doctor away.' What is the missing word?",
       options: [
         { id: "a", text: "A" },
         { id: "b", text: "An" },
@@ -31,14 +33,16 @@ const grammarQuestionsData = {
     {
       id: "en2",
       type: "fill-in-the-blank",
-      questionText: "She ___ (to go) to the park yesterday.",
+      nativeLanguagePrompt: "Instruction: Fill in the blank with the past tense of 'go'.",
+      questionText: "She ___ to the park yesterday.",
       correctAnswers: ["went"],
       explanation: "'Went' is the simple past tense of 'to go'."
     },
     {
       id: "en3",
       type: "multiple-choice",
-      questionText: "Identify the correct plural form: 'There are three ___ on the table.'",
+      nativeLanguagePrompt: "Instruction: Identify the correct plural form of 'book'.",
+      questionText: "There are three ___ on the table.",
       options: [
         { id: "a", text: "book" },
         { id: "b", text: "bookes" },
@@ -48,11 +52,12 @@ const grammarQuestionsData = {
       explanation: "The standard plural form of 'book' is 'books'."
     },
   ],
-  es: [
+  es: [ // Spanish as target language
     {
       id: "es1",
       type: "multiple-choice",
-      questionText: "¿Cuál es la forma correcta del verbo 'ser'?: 'Yo ___ estudiante.'",
+      nativeLanguagePrompt: "Context (English): I am a student. Choose the correct Spanish form for 'I am'.",
+      questionText: "Yo ___ estudiante.",
       options: [
         { id: "a", text: "soy" },
         { id: "b", text: "eres" },
@@ -64,30 +69,108 @@ const grammarQuestionsData = {
     {
       id: "es2",
       type: "fill-in-the-blank",
+      nativeLanguagePrompt: "Context (English): They ate pizza last night. Fill in the blank with the correct Spanish verb form.",
       questionText: "Ellos ___ (comer) pizza anoche.",
       correctAnswers: ["comieron"],
       explanation: "'Comieron' es la forma correcta del pretérito indefinido para 'ellos'."
     },
+    {
+      id: "es3",
+      type: "multiple-choice",
+      nativeLanguagePrompt: "Context (English): The house is big. Choose the correct adjective agreement in Spanish.",
+      questionText: "La casa es ___.",
+      options: [
+        { id: "a", text: "grande" },
+        { id: "b", text: "grandes" },
+        { id: "c", text: "grando" },
+      ],
+      correctOptionId: "a",
+      explanation: "El adjetivo 'grande' concuerda en género y número con 'casa' (femenino singular)."
+    },
   ],
-  // Add more languages and questions as needed
+  fr: [ // French as target language
+    {
+      id: "fr1",
+      type: "multiple-choice",
+      nativeLanguagePrompt: "Context (English): We are happy. Choose the correct French form for 'we are'.",
+      questionText: "Nous ___ contents.",
+      options: [
+        { id: "a", text: "sont" },
+        { id: "b", text: "sommes" },
+        { id: "c", text: "êtes" },
+      ],
+      correctOptionId: "b",
+      explanation: "'Sommes' est la forme correcte de 'être' pour la première personne du pluriel (Nous)."
+    },
+    {
+      id: "fr2",
+      type: "fill-in-the-blank",
+      nativeLanguagePrompt: "Context (English): She has a red car. Fill in the blank with the correct French possessive adjective.",
+      questionText: "Elle a ___ voiture rouge.", // Assuming voiture is known to be feminine
+      correctAnswers: ["sa"],
+      explanation: "'Sa' est l'adjectif possessif correct pour un nom féminin singulier ('voiture') possédé par 'elle'."
+    },
+  ],
+  ua: [ // Ukrainian as target language
+    {
+      id: "ua1",
+      type: "multiple-choice",
+      nativeLanguagePrompt: "Context (English): This is my book. Choose the correct Ukrainian form for 'my'.",
+      questionText: "Це ___ книга.", // книга (knyha) is feminine
+      options: [
+        { id: "a", text: "мій" },   // masculine
+        { id: "b", text: "моя" },   // feminine
+        { id: "c", text: "моє" },   // neuter
+      ],
+      correctOptionId: "b",
+      explanation: "'Моя' (moya) - це правильна присвійна форма для іменника жіночого роду 'книга'."
+    },
+    {
+      id: "ua2",
+      type: "fill-in-the-blank",
+      nativeLanguagePrompt: "Context (English): I read an interesting book. Fill in the blank with the correct Ukrainian verb form.",
+      questionText: "Я ___ (читати) цікаву книгу вчора.",
+      correctAnswers: ["читав", "читала"], // Depending on gender of 'Я'
+      explanation: "Минулий час дієслова 'читати': 'читав' (cholovichyy rid) abo 'читала' (zhinochyy rid)."
+    },
+  ],
+  de: [], // Add German questions if desired
+  it: [], // Add Italian questions if desired
+  pt: [], // Add Portuguese questions if desired
+  ru: [], // Add Russian questions if desired
+  ja: [], // Add Japanese questions if desired
+  ko: [], // Add Korean questions if desired
+  zh: [], // Add Chinese questions if desired
 };
 
-type Question = typeof grammarQuestionsData.en[0];
+type QuestionOption = { id: string; text: string };
+interface Question {
+  id: string;
+  type: "multiple-choice" | "fill-in-the-blank";
+  nativeLanguagePrompt: string;
+  questionText: string;
+  options?: QuestionOption[];
+  correctOptionId?: string;
+  correctAnswers?: string[];
+  explanation: string;
+}
 
 
 export default function GrammarPage() {
-  const { selectedLanguage } = useLearning();
+  const { selectedLanguage, nativeLanguage } = useLearning();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<string>(""); // For multiple choice
-  const [fillBlankAnswer, setFillBlankAnswer] = useState<string>(""); // For fill-in-the-blank
+  const [selectedAnswer, setSelectedAnswer] = useState<string>("");
+  const [fillBlankAnswer, setFillBlankAnswer] = useState<string>("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
 
   useEffect(() => {
-    // Load questions based on selected language
     const langCode = selectedLanguage.code as keyof typeof grammarQuestionsData;
-    const currentQuestions = grammarQuestionsData[langCode] || grammarQuestionsData.en; // Fallback to English
+    // Fallback to English questions if specific language questions are not available or empty
+    const currentQuestions = (grammarQuestionsData[langCode] && grammarQuestionsData[langCode].length > 0)
+                             ? grammarQuestionsData[langCode]
+                             : grammarQuestionsData.en;
     setQuestions(currentQuestions);
     setCurrentQuestionIndex(0);
     setSelectedAnswer("");
@@ -101,10 +184,12 @@ export default function GrammarPage() {
   const handleSubmitAnswer = () => {
     if (!currentQuestion) return;
     setShowFeedback(true);
-    if (currentQuestion.type === "multiple-choice") {
+    if (currentQuestion.type === "multiple-choice" && currentQuestion.correctOptionId) {
       setIsCorrect(selectedAnswer === currentQuestion.correctOptionId);
     } else if (currentQuestion.type === "fill-in-the-blank" && currentQuestion.correctAnswers) {
-      setIsCorrect(currentQuestion.correctAnswers.includes(fillBlankAnswer.trim().toLowerCase()));
+      const userAnswer = fillBlankAnswer.trim().toLowerCase();
+      const correctAnswersLower = currentQuestion.correctAnswers.map(ans => ans.toLowerCase());
+      setIsCorrect(correctAnswersLower.includes(userAnswer));
     }
   };
 
@@ -112,9 +197,8 @@ export default function GrammarPage() {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prevIndex => prevIndex + 1);
     } else {
-      // End of questions, maybe show a summary or reset
-      alert("You've completed all grammar questions for this set!");
-      setCurrentQuestionIndex(0); // Loop back for now
+      alert("You've completed all grammar questions for this set! Reloading for practice.");
+      setCurrentQuestionIndex(0); 
     }
     setShowFeedback(false);
     setSelectedAnswer("");
@@ -122,13 +206,13 @@ export default function GrammarPage() {
     setIsCorrect(false);
   };
   
-  const progressPercentage = questions.length > 0 ? ((currentQuestionIndex + (showFeedback ? 1:0) ) / questions.length) * 100 : 0;
+  const progressPercentage = questions.length > 0 ? ((currentQuestionIndex + (showFeedback ? 1 : 0)) / questions.length) * 100 : 0;
 
   if (questions.length === 0 || !currentQuestion) {
     return (
       <AuthenticatedLayout>
         <div className="flex justify-center items-center h-64">
-          <p className="text-muted-foreground">Loading grammar questions for {selectedLanguage.name}...</p>
+          <p className="text-muted-foreground">Loading grammar questions for {selectedLanguage.name}... If this persists, there might be no questions for this language yet.</p>
         </div>
       </AuthenticatedLayout>
     );
@@ -142,7 +226,7 @@ export default function GrammarPage() {
             Grammar Pro <span className="text-base align-middle text-muted-foreground">({selectedLanguage.name})</span>
           </h1>
           <p className="text-lg text-muted-foreground">
-            Sharpen your grammar skills with interactive drills and explanations.
+            Test your knowledge of {selectedLanguage.name} grammar. Native language: {nativeLanguage.name}.
           </p>
         </section>
 
@@ -158,6 +242,13 @@ export default function GrammarPage() {
              <Progress value={progressPercentage} className="w-full mt-2 h-2" />
           </CardHeader>
           <CardContent className="space-y-6">
+            {currentQuestion.nativeLanguagePrompt && (
+              <div className="p-3 bg-secondary rounded-md">
+                <p className="text-sm text-secondary-foreground italic">
+                  {nativeLanguage.name} Prompt: {currentQuestion.nativeLanguagePrompt}
+                </p>
+              </div>
+            )}
             <p className="text-xl font-semibold text-foreground min-h-[60px]">
               {currentQuestion.questionText}
             </p>
@@ -184,7 +275,7 @@ export default function GrammarPage() {
                 value={fillBlankAnswer}
                 onChange={(e) => setFillBlankAnswer(e.target.value)}
                 disabled={showFeedback}
-                placeholder="Type your answer here"
+                placeholder={`Type your answer in ${selectedLanguage.name}`}
                 className="w-full p-3 border rounded-md focus:ring-primary focus:border-primary text-base"
               />
             )}
@@ -221,13 +312,14 @@ export default function GrammarPage() {
         <Card className="shadow-md bg-card">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-xl font-headline"><BookText className="h-6 w-6 text-primary"/>Grammar Topics for {selectedLanguage.name}</CardTitle>
-                <CardDescription>Review specific grammar rules and concepts.</CardDescription>
+                <CardDescription>Review specific grammar rules and concepts (feature coming soon).</CardDescription>
             </CardHeader>
             <CardContent>
                 <ul className="space-y-2">
-                    {["Present Tense", "Past Tense", "Articles", "Prepositions", "Sentence Structure"].map(topic => (
+                    {/* This could be dynamically generated based on target language in a real app */}
+                    {["Verb Conjugation (Present Tense)", "Noun Genders & Articles", "Adjective Agreement", "Basic Sentence Structure", "Prepositions of Place"].map(topic => (
                         <li key={topic}>
-                            <Button variant="link" className="p-0 h-auto text-primary hover:text-accent">
+                            <Button variant="link" className="p-0 h-auto text-primary hover:text-accent" disabled>
                                 {topic} (Coming Soon)
                             </Button>
                         </li>
@@ -240,3 +332,4 @@ export default function GrammarPage() {
     </AuthenticatedLayout>
   );
 }
+
