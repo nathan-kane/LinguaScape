@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; // Added missing import
 import { useLearning } from '@/context/LearningContext';
 import { Separator } from '@/components/ui/separator';
 
@@ -61,6 +61,29 @@ const grammarQuestionsData = {
       correctUsageExample: "There are three books on the table.",
       explanation: "To make most English nouns plural, you add an '-s' at the end. 'Bookes' is not a correct plural form."
     },
+    {
+      id: "en4",
+      type: "multiple-choice",
+      nativeLanguagePrompt: "Instruction: Choose the correct form of 'to be'.",
+      questionText: "They ___ happy to see us.",
+      options: [
+        { id: "a", text: "is" },
+        { id: "b", text: "are" },
+        { id: "c", text: "am" },
+      ],
+      correctOptionId: "b",
+      correctUsageExample: "They are happy to see us.",
+      explanation: "'Are' is the correct form of the verb 'to be' for the third person plural ('They')."
+    },
+    {
+      id: "en5",
+      type: "fill-in-the-blank",
+      nativeLanguagePrompt: "Instruction: Fill in the blank with the correct comparative adjective for 'good'.",
+      questionText: "This book is ___ than the last one I read.",
+      correctAnswers: ["better"],
+      correctUsageExample: "This book is better than the last one I read.",
+      explanation: "'Better' is the irregular comparative form of 'good'. We use it to compare two things."
+    },
   ],
   es: [
     {
@@ -100,6 +123,29 @@ const grammarQuestionsData = {
       correctUsageExample: "La casa es grande.",
       explanation: "In Spanish, adjectives must agree in gender and number with the noun they describe. 'Casa' is feminine singular, so 'grande' is the correct form. 'Grande' is an adjective that doesn't change for feminine/masculine singular."
     },
+    {
+      id: "es4",
+      type: "multiple-choice",
+      nativeLanguagePrompt: "Context (English): You (informal, singular) have a book. Choose the correct Spanish verb form.",
+      questionText: "Tú ___ un libro.",
+      options: [
+        { id: "a", text: "tengo" },
+        { id: "b", text: "tiene" },
+        { id: "c", text: "tienes" },
+      ],
+      correctOptionId: "c",
+      correctUsageExample: "Tú tienes un libro.",
+      explanation: "'Tienes' is the correct form of the verb 'tener' (to have) for the second person informal singular ('Tú' - You)."
+    },
+    {
+      id: "es5",
+      type: "fill-in-the-blank",
+      nativeLanguagePrompt: "Context (English): We speak Spanish. Fill in the blank with the correct Spanish verb form.",
+      questionText: "Nosotros ___ (hablar) español.",
+      correctAnswers: ["hablamos"],
+      correctUsageExample: "Nosotros hablamos español.",
+      explanation: "'Hablamos' is the present tense form of 'hablar' (to speak) for 'nosotros/nosotras' (we)."
+    },
   ],
   fr: [
     {
@@ -124,6 +170,29 @@ const grammarQuestionsData = {
       correctAnswers: ["sa"],
       correctUsageExample: "Elle a sa voiture rouge.",
       explanation: "'Sa' is the correct feminine singular possessive adjective for 'elle' (she/her) when the noun ('voiture' - car) is feminine. 'Son' is for masculine nouns or feminine nouns starting with a vowel/h, and 'ses' is for plural."
+    },
+    {
+      id: "fr3",
+      type: "multiple-choice",
+      nativeLanguagePrompt: "Context (English): They (masculine) go to the market. Choose the correct French verb form.",
+      questionText: "Ils ___ au marché.",
+      options: [
+        { id: "a", text: "va" },
+        { id: "b", text: "vont" },
+        { id: "c", text: "allez" },
+      ],
+      correctOptionId: "b",
+      correctUsageExample: "Ils vont au marché.",
+      explanation: "'Vont' is the correct form of the verb 'aller' (to go) for 'ils' (they, masculine plural)."
+    },
+    {
+      id: "fr4",
+      type: "fill-in-the-blank",
+      nativeLanguagePrompt: "Context (English): I like apples. Fill in the blank with the correct French definite article.",
+      questionText: "J'aime ___ pommes.",
+      correctAnswers: ["les"],
+      correctUsageExample: "J'aime les pommes.",
+      explanation: "'Les' is the plural definite article (the) in French, used for both masculine and feminine plural nouns like 'pommes' (apples)."
     },
   ],
   ua: [
@@ -150,14 +219,37 @@ const grammarQuestionsData = {
       correctUsageExample: "Я читав цікаву книгу вчора. (if 'I' is male) / Я читала цікаву книгу вчора. (if 'I' is female)",
       explanation: "The past tense of 'читати' (chytaty - to read) in Ukrainian depends on the gender of the subject 'Я' (I). It's 'читав' (chytav) for masculine and 'читала' (chytala) for feminine."
     },
+    {
+      id: "ua3",
+      type: "multiple-choice",
+      nativeLanguagePrompt: "Context (English): They see a cat. Choose the correct Ukrainian verb form for 'they see'.",
+      questionText: "Вони ___ кота.",
+      options: [
+        { id: "a", text: "бачу" },    // I see
+        { id: "b", text: "бачиш" },   // You (sg) see
+        { id: "c", text: "бачать" },  // They see
+      ],
+      correctOptionId: "c",
+      correctUsageExample: "Вони бачать кота.",
+      explanation: "'Бачать' (bachat') is the correct present tense form of the verb 'бачити' (bachyty - to see) for 'вони' (vony - they)."
+    },
+    {
+      id: "ua4",
+      type: "fill-in-the-blank",
+      nativeLanguagePrompt: "Context (English): This is a big city. Fill in the blank with the correct Ukrainian adjective for 'big' agreeing with 'city' (місто - neuter).",
+      questionText: "Це ___ місто.",
+      correctAnswers: ["велике"],
+      correctUsageExample: "Це велике місто.",
+      explanation: "'Велике' (velyke) is the neuter singular form of the adjective 'великий' (velykai - big), agreeing with the neuter noun 'місто' (misto - city)."
+    }
   ],
-  de: [],
-  it: [],
-  pt: [],
-  ru: [],
-  ja: [],
-  ko: [],
-  zh: [],
+  de: [], // Placeholder for German
+  it: [], // Placeholder for Italian
+  pt: [], // Placeholder for Portuguese
+  ru: [], // Placeholder for Russian
+  ja: [], // Placeholder for Japanese
+  ko: [], // Placeholder for Korean
+  zh: [], // Placeholder for Chinese
 };
 
 type QuestionOption = { id: string; text: string };
@@ -215,7 +307,7 @@ export default function GrammarPage() {
       setCurrentQuestionIndex(prevIndex => prevIndex + 1);
     } else {
       alert("You've completed all grammar questions for this set! Reloading for practice.");
-      setCurrentQuestionIndex(0);
+      setCurrentQuestionIndex(0); // Loop back for now
     }
     setShowFeedback(false);
     setSelectedAnswer("");
@@ -249,7 +341,7 @@ export default function GrammarPage() {
             Grammar Pro <span className="text-base align-middle text-muted-foreground">({selectedLanguage.name})</span>
           </h1>
           <p className="text-lg text-muted-foreground">
-            Test your knowledge of {selectedLanguage.name} grammar. Your native language for explanations is {nativeLanguage.name}.
+            Test your knowledge of {selectedLanguage.name} grammar. Prompts and explanations are in {nativeLanguage.name}.
           </p>
         </section>
 
@@ -363,3 +455,4 @@ export default function GrammarPage() {
     </AuthenticatedLayout>
   );
 }
+
