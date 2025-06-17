@@ -5,18 +5,25 @@ import React, { useState, useEffect } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit3, CheckSquare, XSquare, ChevronRight, BookText } from "lucide-react";
+import { Edit3, CheckSquare, XSquare, ChevronRight, BookText, Target, AlertCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { useLearning } from '@/context/LearningContext';
+import { Separator } from '@/components/ui/separator';
 
 // Placeholder data for grammar questions
-// Native language prompts are in English for this placeholder data.
+// nativeLanguagePrompt: Instruction/context in English (simulating native language for the user).
+// questionText: The actual question, primarily in the TARGET language.
+// options: Multiple-choice options in the TARGET language.
+// correctAnswers: For fill-in-the-blank, in the TARGET language.
+// correctUsageExample: The correct sentence/phrase in the TARGET language.
+// explanation: Explanation of the rule, in English (simulating native language for the user).
+
 const grammarQuestionsData = {
-  en: [ // Assuming English is the target language, native prompt might be for context or specific instruction
+  en: [
     {
       id: "en1",
       type: "multiple-choice",
@@ -28,7 +35,8 @@ const grammarQuestionsData = {
         { id: "c", text: "The" },
       ],
       correctOptionId: "b",
-      explanation: "'An' is used before words starting with a vowel sound, like 'apple'."
+      correctUsageExample: "'An apple a day keeps the doctor away.'",
+      explanation: "Use 'an' before words that start with a vowel sound (like 'apple'). 'A' is used before consonant sounds."
     },
     {
       id: "en2",
@@ -36,7 +44,8 @@ const grammarQuestionsData = {
       nativeLanguagePrompt: "Instruction: Fill in the blank with the past tense of 'go'.",
       questionText: "She ___ to the park yesterday.",
       correctAnswers: ["went"],
-      explanation: "'Went' is the simple past tense of 'to go'."
+      correctUsageExample: "She went to the park yesterday.",
+      explanation: "'Went' is the simple past tense of the verb 'to go'. We use it for completed actions in the past."
     },
     {
       id: "en3",
@@ -49,10 +58,11 @@ const grammarQuestionsData = {
         { id: "c", text: "books" },
       ],
       correctOptionId: "c",
-      explanation: "The standard plural form of 'book' is 'books'."
+      correctUsageExample: "There are three books on the table.",
+      explanation: "To make most English nouns plural, you add an '-s' at the end. 'Bookes' is not a correct plural form."
     },
   ],
-  es: [ // Spanish as target language
+  es: [
     {
       id: "es1",
       type: "multiple-choice",
@@ -64,15 +74,17 @@ const grammarQuestionsData = {
         { id: "c", text: "es" },
       ],
       correctOptionId: "a",
-      explanation: "'Soy' es la forma correcta de 'ser' para la primera persona del singular (Yo)."
+      correctUsageExample: "Yo soy estudiante.",
+      explanation: "In Spanish, 'soy' is the correct form of the verb 'ser' (to be) for the first person singular ('Yo' - I). Use 'soy' for permanent characteristics or professions."
     },
     {
       id: "es2",
       type: "fill-in-the-blank",
-      nativeLanguagePrompt: "Context (English): They ate pizza last night. Fill in the blank with the correct Spanish verb form.",
+      nativeLanguagePrompt: "Context (English): They ate pizza last night. Fill in the blank with the correct Spanish verb form for 'to eat' (comer) in the past.",
       questionText: "Ellos ___ (comer) pizza anoche.",
       correctAnswers: ["comieron"],
-      explanation: "'Comieron' es la forma correcta del pretérito indefinido para 'ellos'."
+      correctUsageExample: "Ellos comieron pizza anoche.",
+      explanation: "'Comieron' is the past preterite tense of 'comer' for 'ellos/ellas/ustedes' (they/you all). It's used for completed actions in the past."
     },
     {
       id: "es3",
@@ -85,10 +97,11 @@ const grammarQuestionsData = {
         { id: "c", text: "grando" },
       ],
       correctOptionId: "a",
-      explanation: "El adjetivo 'grande' concuerda en género y número con 'casa' (femenino singular)."
+      correctUsageExample: "La casa es grande.",
+      explanation: "In Spanish, adjectives must agree in gender and number with the noun they describe. 'Casa' is feminine singular, so 'grande' is the correct form. 'Grande' is an adjective that doesn't change for feminine/masculine singular."
     },
   ],
-  fr: [ // French as target language
+  fr: [
     {
       id: "fr1",
       type: "multiple-choice",
@@ -100,47 +113,51 @@ const grammarQuestionsData = {
         { id: "c", text: "êtes" },
       ],
       correctOptionId: "b",
-      explanation: "'Sommes' est la forme correcte de 'être' pour la première personne du pluriel (Nous)."
+      correctUsageExample: "Nous sommes contents.",
+      explanation: "'Sommes' is the correct form of the verb 'être' (to be) for 'nous' (we) in French."
     },
     {
       id: "fr2",
       type: "fill-in-the-blank",
-      nativeLanguagePrompt: "Context (English): She has a red car. Fill in the blank with the correct French possessive adjective.",
-      questionText: "Elle a ___ voiture rouge.", // Assuming voiture is known to be feminine
+      nativeLanguagePrompt: "Context (English): She has a red car. Fill in the blank with the correct French possessive adjective for 'her' car.",
+      questionText: "Elle a ___ voiture rouge.", // voiture is feminine
       correctAnswers: ["sa"],
-      explanation: "'Sa' est l'adjectif possessif correct pour un nom féminin singulier ('voiture') possédé par 'elle'."
+      correctUsageExample: "Elle a sa voiture rouge.",
+      explanation: "'Sa' is the correct feminine singular possessive adjective for 'elle' (she/her) when the noun ('voiture' - car) is feminine. 'Son' is for masculine nouns or feminine nouns starting with a vowel/h, and 'ses' is for plural."
     },
   ],
-  ua: [ // Ukrainian as target language
+  ua: [
     {
       id: "ua1",
       type: "multiple-choice",
-      nativeLanguagePrompt: "Context (English): This is my book. Choose the correct Ukrainian form for 'my'.",
-      questionText: "Це ___ книга.", // книга (knyha) is feminine
+      nativeLanguagePrompt: "Context (English): This is my book. Choose the correct Ukrainian form for 'my' when 'book' (книга - knyha) is feminine.",
+      questionText: "Це ___ книга.",
       options: [
         { id: "a", text: "мій" },   // masculine
         { id: "b", text: "моя" },   // feminine
         { id: "c", text: "моє" },   // neuter
       ],
       correctOptionId: "b",
-      explanation: "'Моя' (moya) - це правильна присвійна форма для іменника жіночого роду 'книга'."
+      correctUsageExample: "Це моя книга.",
+      explanation: "In Ukrainian, 'моя' (moya) is the possessive pronoun 'my' for feminine singular nouns like 'книга' (knyha - book). 'Мій' (miy) is for masculine, and 'моє' (moye) is for neuter."
     },
     {
       id: "ua2",
       type: "fill-in-the-blank",
-      nativeLanguagePrompt: "Context (English): I read an interesting book. Fill in the blank with the correct Ukrainian verb form.",
+      nativeLanguagePrompt: "Context (English): I read an interesting book yesterday. Fill in the blank with the correct Ukrainian past tense verb form of 'to read' (читати).",
       questionText: "Я ___ (читати) цікаву книгу вчора.",
       correctAnswers: ["читав", "читала"], // Depending on gender of 'Я'
-      explanation: "Минулий час дієслова 'читати': 'читав' (cholovichyy rid) abo 'читала' (zhinochyy rid)."
+      correctUsageExample: "Я читав цікаву книгу вчора. (if 'I' is male) / Я читала цікаву книгу вчора. (if 'I' is female)",
+      explanation: "The past tense of 'читати' (chytaty - to read) in Ukrainian depends on the gender of the subject 'Я' (I). It's 'читав' (chytav) for masculine and 'читала' (chytala) for feminine."
     },
   ],
-  de: [], // Add German questions if desired
-  it: [], // Add Italian questions if desired
-  pt: [], // Add Portuguese questions if desired
-  ru: [], // Add Russian questions if desired
-  ja: [], // Add Japanese questions if desired
-  ko: [], // Add Korean questions if desired
-  zh: [], // Add Chinese questions if desired
+  de: [],
+  it: [],
+  pt: [],
+  ru: [],
+  ja: [],
+  ko: [],
+  zh: [],
 };
 
 type QuestionOption = { id: string; text: string };
@@ -152,6 +169,7 @@ interface Question {
   options?: QuestionOption[];
   correctOptionId?: string;
   correctAnswers?: string[];
+  correctUsageExample: string;
   explanation: string;
 }
 
@@ -167,10 +185,9 @@ export default function GrammarPage() {
 
   useEffect(() => {
     const langCode = selectedLanguage.code as keyof typeof grammarQuestionsData;
-    // Fallback to English questions if specific language questions are not available or empty
     const currentQuestions = (grammarQuestionsData[langCode] && grammarQuestionsData[langCode].length > 0)
                              ? grammarQuestionsData[langCode]
-                             : grammarQuestionsData.en;
+                             : grammarQuestionsData.en; // Fallback to English if no questions for the selected language
     setQuestions(currentQuestions);
     setCurrentQuestionIndex(0);
     setSelectedAnswer("");
@@ -198,7 +215,7 @@ export default function GrammarPage() {
       setCurrentQuestionIndex(prevIndex => prevIndex + 1);
     } else {
       alert("You've completed all grammar questions for this set! Reloading for practice.");
-      setCurrentQuestionIndex(0); 
+      setCurrentQuestionIndex(0);
     }
     setShowFeedback(false);
     setSelectedAnswer("");
@@ -212,7 +229,13 @@ export default function GrammarPage() {
     return (
       <AuthenticatedLayout>
         <div className="flex justify-center items-center h-64">
-          <p className="text-muted-foreground">Loading grammar questions for {selectedLanguage.name}... If this persists, there might be no questions for this language yet.</p>
+          <Alert variant="default" className="max-w-md">
+            <AlertCircle className="h-5 w-5" />
+            <AlertTitle>Loading Questions</AlertTitle>
+            <AlertDescription>
+              Loading grammar questions for {selectedLanguage.name}. If this persists, there might be no questions for this language yet, or an error occurred.
+            </AlertDescription>
+          </Alert>
         </div>
       </AuthenticatedLayout>
     );
@@ -226,7 +249,7 @@ export default function GrammarPage() {
             Grammar Pro <span className="text-base align-middle text-muted-foreground">({selectedLanguage.name})</span>
           </h1>
           <p className="text-lg text-muted-foreground">
-            Test your knowledge of {selectedLanguage.name} grammar. Native language: {nativeLanguage.name}.
+            Test your knowledge of {selectedLanguage.name} grammar. Your native language for explanations is {nativeLanguage.name}.
           </p>
         </section>
 
@@ -245,7 +268,7 @@ export default function GrammarPage() {
             {currentQuestion.nativeLanguagePrompt && (
               <div className="p-3 bg-secondary rounded-md">
                 <p className="text-sm text-secondary-foreground italic">
-                  {nativeLanguage.name} Prompt: {currentQuestion.nativeLanguagePrompt}
+                  Context ({nativeLanguage.name}): {currentQuestion.nativeLanguagePrompt}
                 </p>
               </div>
             )}
@@ -304,7 +327,16 @@ export default function GrammarPage() {
               {isCorrect ? "Correct!" : "Not quite..."}
             </AlertTitle>
             <AlertDescription className={isCorrect ? "text-green-600" : "text-red-600"}>
-              {currentQuestion.explanation}
+              {!isCorrect && currentQuestion.correctUsageExample && (
+                <div className="mb-2">
+                  <p className="font-semibold">Correct usage in {selectedLanguage.name}:</p>
+                  <p className="italic text-base">{currentQuestion.correctUsageExample}</p>
+                </div>
+              )}
+              <div className="mt-1">
+                <p className="font-semibold">Explanation in {nativeLanguage.name}:</p>
+                <p>{currentQuestion.explanation}</p>
+              </div>
             </AlertDescription>
           </Alert>
         )}
@@ -316,7 +348,6 @@ export default function GrammarPage() {
             </CardHeader>
             <CardContent>
                 <ul className="space-y-2">
-                    {/* This could be dynamically generated based on target language in a real app */}
                     {["Verb Conjugation (Present Tense)", "Noun Genders & Articles", "Adjective Agreement", "Basic Sentence Structure", "Prepositions of Place"].map(topic => (
                         <li key={topic}>
                             <Button variant="link" className="p-0 h-auto text-primary hover:text-accent" disabled>
@@ -332,4 +363,3 @@ export default function GrammarPage() {
     </AuthenticatedLayout>
   );
 }
-
