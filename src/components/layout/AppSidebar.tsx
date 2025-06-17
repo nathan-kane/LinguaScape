@@ -1,13 +1,14 @@
 
 "use client";
 
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { NAV_LINKS_MAIN, NAV_LINKS_USER, APP_NAME, APP_LOGO_ICON } from "@/lib/constants";
+import { NAV_LINKS_MAIN, APP_NAME, APP_LOGO_ICON } from "@/lib/constants";
 import type { NavItem } from "@/lib/types";
 import { Logo } from "@/components/shared/Logo";
 import {
@@ -21,11 +22,57 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useLearning } from "@/context/LearningContext";
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { app } from '@/lib/firebase';
+import type { ProfileData } from '@/app/profile/page';
 
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { state: sidebarState, isMobile, setOpenMobile }  = useSidebar(); // Get sidebar state
+  const { state: sidebarState, isMobile, setOpenMobile, mounted: sidebarMounted }  = useSidebar(); 
+  const { authUser, isLoadingPreferences } = useLearning();
+
+  const [userName, setUserName] = useState("User");
+  const [userAvatarUrl, setUserAvatarUrl] = useState("https://placehold.co/100x100.png");
+  const [userAvatarFallback, setUserAvatarFallback] = useState("U");
+
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      if (authUser) {
+        let name = authUser.displayName || authUser.email?.split('@')[0] || "User";
+        let avatarUrl = authUser.photoURL || "https://placehold.co/100x100.png";
+        
+        const db = getFirestore(app);
+        const userDocRef = doc(db, "users", authUser.uid);
+        try {
+          const docSnap = await getDoc(userDocRef);
+          if (docSnap.exists()) {
+            const firestoreData = docSnap.data() as ProfileData;
+            name = firestoreData.displayName || name;
+            avatarUrl = firestoreData.photoURL || avatarUrl;
+          }
+        } catch (error) {
+          console.error("Error fetching user details for sidebar:", error);
+        }
+        
+        setUserName(name);
+        setUserAvatarUrl(avatarUrl);
+        setUserAvatarFallback(name.charAt(0).toUpperCase() || "U");
+
+      } else {
+        // Reset if user logs out
+        setUserName("User");
+        setUserAvatarUrl("https://placehold.co/100x100.png");
+        setUserAvatarFallback("U");
+      }
+    };
+
+    if (!isLoadingPreferences) {
+      fetchUserDetails();
+    }
+  }, [authUser, isLoadingPreferences]);
+
 
   const isActive = (item: NavItem) => {
     if (item.matchStartsWith) {
@@ -35,15 +82,15 @@ export function AppSidebar() {
   };
 
   const handleLinkClick = () => {
-    if (isMobile) {
+    if (isMobile && sidebarMounted) { // Check mounted for isMobile
       setOpenMobile(false);
     }
   };
 
   return (
-    <Sidebar side="left" variant="sidebar" collapsible={isMobile ? "offcanvas" : "icon"}>
+    <Sidebar side="left" variant="sidebar" collapsible={isMobile && sidebarMounted ? "offcanvas" : "icon"}>
       <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <Logo iconSize={sidebarState === 'collapsed' && !isMobile ? 28 : 24} showText={sidebarState === 'expanded' || isMobile} />
+        <Logo iconSize={sidebarState === 'collapsed' && !isMobile && sidebarMounted ? 28 : 24} showText={sidebarState === 'expanded' || (isMobile && sidebarMounted)} />
       </SidebarHeader>
 
       <SidebarContent className="flex-1">
@@ -59,7 +106,7 @@ export function AppSidebar() {
                     className="font-body"
                   >
                     <item.icon className="h-5 w-5" />
-                    <span className={cn(sidebarState === 'collapsed' && !isMobile && "hidden")}>{item.label}</span>
+                    <span className={cn(sidebarState === 'collapsed' && !isMobile && sidebarMounted && "hidden")}>{item.label}</span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -72,13 +119,13 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-3">
           <Link href="/profile" onClick={handleLinkClick}>
-            <Button variant="ghost" className={cn("w-full justify-start gap-2 px-2", sidebarState === 'collapsed' && !isMobile && "justify-center Aspect-square p-0")}>
+            <Button variant="ghost" className={cn("w-full justify-start gap-2 px-2", sidebarState === 'collapsed' && !isMobile && sidebarMounted && "justify-center Aspect-square p-0")}>
               <Avatar className="h-8 w-8">
-                <AvatarImage src="https://placehold.co/100x100.png" alt="User avatar" data-ai-hint="user avatar" />
-                <AvatarFallback>U</AvatarFallback>
+                <AvatarImage src={userAvatarUrl} alt={userName} data-ai-hint="user avatar" />
+                <AvatarFallback>{userAvatarFallback}</AvatarFallback>
               </Avatar>
-              <div className={cn("flex flex-col items-start", sidebarState === 'collapsed' && !isMobile && "hidden")}>
-                <span className="text-sm font-medium text-sidebar-foreground">User Name</span>
+              <div className={cn("flex flex-col items-start", sidebarState === 'collapsed' && !isMobile && sidebarMounted && "hidden")}>
+                <span className="text-sm font-medium text-sidebar-foreground truncate max-w-[120px]">{userName}</span>
                 <span className="text-xs text-sidebar-foreground/70">View Profile</span>
               </div>
             </Button>
@@ -87,4 +134,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-
