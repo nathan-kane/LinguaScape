@@ -5,7 +5,7 @@
  *
  * - generateVocabulary - A function that handles vocabulary generation.
  * - GenerateVocabularyInput - The input type for the generateVocabulary function.
- * - GenerateVocabularyOutput - The return type for the generateVocabulary function.
+ * - GenerateVocabularyResult - The return type for the generateVocabulary function.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,28 +17,30 @@ const VocabularyWordSchema = z.object({
   word: z.string().describe('The vocabulary word in the target language.'),
   translation: z.string().describe('The translation of the word into the specified native language.'),
   exampleSentence: z.string().describe('An example sentence using the word in the target language.'),
-  wordType: z.enum(['noun', 'verb', 'adjective', 'phrase', 'other']).describe('The grammatical type of the word.'),
+  wordType: z.enum(['noun', 'verb', 'adjective', 'phrase', 'other']).describe('The grammatical type of sensitized_word_type.'),
   dataAiHint: z.string().describe('A short hint (1-2 words) for generating an image related to the word/example. Do not include the word itself in the hint.'),
 });
 
-// Input schema for the flow
-export const GenerateVocabularyInputSchema = z.object({
+// Input schema for the flow (INTERNAL - NOT EXPORTED AS OBJECT)
+const GenerateVocabularyInputSchema = z.object({
   languageName: z.string().describe("The name of the target language (e.g., 'Spanish', 'French')."),
   languageCode: z.string().describe("The code of the target language (e.g., 'es', 'fr')."),
   modeName: z.string().describe("The name of the learning mode (e.g., 'Travel', 'Conversational')."),
   nativeLanguageName: z.string().describe("The user's native language (e.g., 'English'). The translation should be to this language."),
   count: z.number().int().positive().min(5).max(15).default(7).describe("The number of vocabulary words to generate."),
 });
-export type GenerateVocabularyInput = z.infer<typeof GenerateVocabularyInputSchema>;
+export type GenerateVocabularyInput = z.infer<typeof GenerateVocabularyInputSchema>; // TYPE IS EXPORTED
 
-// Output schema for the flow, containing an array of the vocabulary words
-const GenerateVocabularyOutputSchema = z.object({
+// Output schema for the flow (INTERNAL - NOT EXPORTED AS OBJECT)
+// This is what the LLM is expected to return (before we add wordBankId)
+const GenerateVocabularyLLMOutputSchema = z.object({
   vocabulary: z.array(
-    // The output from the LLM won't have wordBankId, so we make it optional here for the raw output
     VocabularyWordSchema.omit({ wordBankId: true }) 
   ).describe('A list of generated vocabulary words, excluding wordBankId which is added by the flow.'),
 });
-export type GenerateVocabularyOutput = z.infer<typeof GenerateVocabularyOutputSchema>;
+// Output type based on LLM output schema
+export type GenerateVocabularyLLMOutput = z.infer<typeof GenerateVocabularyLLMOutputSchema>;
+
 
 // Final output type for the exported wrapper function, which includes wordBankId
 export type GenerateVocabularyResult = {
@@ -48,13 +50,14 @@ export type GenerateVocabularyResult = {
 
 // Exported wrapper function for client/server component consumption
 export async function generateVocabulary(input: GenerateVocabularyInput): Promise<GenerateVocabularyResult> {
-  return _generateVocabularyFlow(input);
+  const flowResult = await _generateVocabularyFlow(input);
+  return { vocabulary: flowResult };
 }
 
 const vocabularyPrompt = ai.definePrompt({
   name: 'generateVocabularyPrompt',
-  input: { schema: GenerateVocabularyInputSchema },
-  output: { schema: GenerateVocabularyOutputSchema }, // LLM output schema doesn't include wordBankId
+  input: { schema: GenerateVocabularyInputSchema }, // Uses internal schema
+  output: { schema: GenerateVocabularyLLMOutputSchema }, // LLM output schema (without wordBankId)
   prompt: `You are an expert linguist creating vocabulary lists for a language learning app.
 Generate a diverse list of exactly {{{count}}} vocabulary words for learning {{{languageName}}}, tailored for a "{{{modeName}}}" learning mode.
 The user's native language is {{{nativeLanguageName}}}. All translations MUST be into {{{nativeLanguageName}}}.
@@ -84,17 +87,15 @@ Example of a single item in the "vocabulary" array (excluding wordBankId):
 
 const _generateVocabularyFlow = ai.defineFlow(
   {
-    name: 'generateVocabularyFlowInternal', // Renamed internal flow
-    inputSchema: GenerateVocabularyInputSchema,
-    outputSchema: VocabularyWordSchema.array(), // The flow will ultimately return the full schema array
+    name: 'generateVocabularyFlowInternal',
+    inputSchema: GenerateVocabularyInputSchema, // Uses internal schema
+    outputSchema: VocabularyWordSchema.array(), // The flow itself will return the full schema array including wordBankId
   },
-  async (input): Promise<z.infer<typeof VocabularyWordSchema>[]> => { // Return type is array of full VocabularyWordSchema
-    const { output } = await vocabularyPrompt(input);
+  async (input): Promise<z.infer<typeof VocabularyWordSchema>[]> => {
+    const { output } = await vocabularyPrompt(input); // output is GenerateVocabularyLLMOutput
 
     if (!output || !output.vocabulary) {
       console.error('Vocabulary generation prompt failed or returned empty/invalid data from LLM.');
-      // Consider throwing an error or returning a predefined empty/error structure
-      // For now, returning an empty array to allow fallback on the client.
       return [];
     }
 
@@ -104,6 +105,7 @@ const _generateVocabularyFlow = ai.defineFlow(
       wordBankId: `${input.languageCode}_${input.modeName.replace(/\s+/g, '-').toLowerCase()}_${Date.now()}_${index}`,
     }));
 
-    return vocabularyWithIds; // This matches the flow's outputSchema now
+    return vocabularyWithIds;
   }
 );
+
