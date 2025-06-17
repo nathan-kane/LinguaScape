@@ -55,7 +55,7 @@ export default function ProgressTrackerPage() {
         languageCode: selectedLanguage.code,
         modeName: selectedMode.name,
         nativeLanguageName: nativeLanguage.name,
-        count: 20, // Fetch a decent size pool to display
+        count: 15, // Adjusted count to be within schema limits (was 20)
       };
       
       const result: GenerateVocabularyResult = await generateVocabulary(input);
@@ -247,3 +247,4 @@ export default function ProgressTrackerPage() {
     </AuthenticatedLayout>
   );
 }
+
