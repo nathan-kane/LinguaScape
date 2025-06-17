@@ -1,3 +1,4 @@
+
 "use client";
 
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
@@ -15,7 +16,7 @@ const listeningExercises = [
   {
     id: "1",
     title: "Ordering Coffee in Paris",
-    audioUrl: "/audio/placeholder-coffee.mp3", // Placeholder, won't actually play
+    audioUrl: "/audio/placeholder-coffee.mp3", // Placeholder, won't actually play unless file exists in /public/audio
     language: "French",
     difficulty: "Beginner",
     transcript: "Bonjour, je voudrais un café, s'il vous plaît. \nOui, bien sûr. Un café noir ou au lait? \nNoir, s'il vous plaît. \nVoilà. Ça fait deux euros.",
@@ -24,7 +25,18 @@ const listeningExercises = [
       { id: "q2", text: "How much did it cost?", options: [{id: "a", text:"One euro"}, {id: "b", text:"Two euros"}, {id: "c", text:"Three euros"}], correctOptionId: "b" },
     ]
   },
-  // Add more exercises
+  {
+    id: "2",
+    title: "Asking for Directions in Madrid",
+    audioUrl: "/audio/placeholder-directions.mp3",
+    language: "Spanish",
+    difficulty: "Beginner",
+    transcript: "Perdona, ¿cómo llego al Museo del Prado? \nSiga todo recto y luego gire a la derecha en la segunda calle. \nMuchas gracias. \nDe nada.",
+    questions: [
+      { id: "q1", text: "What is the person looking for?", options: [{id: "a", text:"A restaurant"}, {id: "b", text:"The Prado Museum"}, {id: "c", text:"A train station"}], correctOptionId: "b" },
+      { id: "q2", text: "What is the second instruction?", options: [{id: "a", text:"Turn left"}, {id: "b", text:"Go straight"}, {id: "c", text:"Turn right"}], correctOptionId: "c" },
+    ]
+  }
 ];
 
 export default function ListeningPage() {
@@ -35,30 +47,58 @@ export default function ListeningPage() {
   const [submitted, setSubmitted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  useEffect(() => {
+    const audioElement = audioRef.current;
+    if (audioElement) {
+      const handleAudioEnd = () => {
+        setIsPlaying(false);
+      };
+      audioElement.addEventListener('ended', handleAudioEnd);
+      return () => {
+        audioElement.removeEventListener('ended', handleAudioEnd);
+        if (!audioElement.paused) {
+          audioElement.pause();
+        }
+      };
+    }
+  }, [currentExercise.audioUrl]); // Re-run if the audio source changes
+
+
   const togglePlay = () => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        // audioRef.current.play(); // This would play if audio existed
-        alert("Audio playback is simulated.");
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            setIsPlaying(true);
+          }).catch(error => {
+            console.warn("Audio playback error (this is expected for placeholder audio files):", error);
+            alert("Audio playback is simulated as the placeholder audio file might not be available. In a real app, ensure valid audio files are present at paths like " + currentExercise.audioUrl);
+            setIsPlaying(false); 
+          });
+        } else {
+           alert("Audio playback is simulated (play() did not return a promise). Ensure valid audio files in a real app.");
+           setIsPlaying(false);
+        }
       }
-      setIsPlaying(!isPlaying);
+    } else {
+        alert("Audio element not available.");
     }
   };
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
     setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
-    setSubmitted(false);
+    setSubmitted(false); // Allow re-submission if an answer is changed
   };
 
   const handleSubmitAnswers = () => {
     setSubmitted(true);
-    // In a real app, calculate score etc.
   };
   
   const loadNextExercise = () => {
-    // Cycle through exercises (placeholder logic)
     const currentIndex = listeningExercises.findIndex(ex => ex.id === currentExercise.id);
     const nextIndex = (currentIndex + 1) % listeningExercises.length;
     setCurrentExercise(listeningExercises[nextIndex]);
@@ -66,8 +106,21 @@ export default function ListeningPage() {
     setShowTranscript(false);
     setSelectedAnswers({});
     setSubmitted(false);
-    if (audioRef.current) audioRef.current.currentTime = 0;
+    if (audioRef.current) {
+        audioRef.current.pause(); // Stop previous audio
+        audioRef.current.currentTime = 0; // Reset time
+        // audioRef.current.load(); // Some browsers might need this if src changes dynamically (handled by currentExercise.audioUrl in key for audio element)
+    }
   };
+  
+  useEffect(() => {
+    // If currentExercise changes, we want to ensure the audio element reloads its source.
+    // The 'key' prop on the audio element helps achieve this.
+    if (audioRef.current) {
+        audioRef.current.load(); // Explicitly load new source
+    }
+  }, [currentExercise.audioUrl]);
+
 
   return (
     <AuthenticatedLayout>
@@ -98,7 +151,8 @@ export default function ListeningPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-center p-6 bg-secondary rounded-lg">
-              <audio ref={audioRef} src={currentExercise.audioUrl} hidden />
+              {/* By adding a key, React will re-create the audio element when audioUrl changes, ensuring new source loading */}
+              <audio ref={audioRef} src={currentExercise.audioUrl} key={currentExercise.audioUrl} hidden />
               <Button onClick={togglePlay} size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isPlaying ? <PauseCircle className="mr-2 h-6 w-6" /> : <PlayCircle className="mr-2 h-6 w-6" />}
                 {isPlaying ? "Pause Audio" : "Play Audio"}
@@ -134,7 +188,8 @@ export default function ListeningPage() {
                 <RadioGroup 
                     value={selectedAnswers[q.id] || ""}
                     onValueChange={(value) => handleAnswerChange(q.id, value)}
-                    disabled={submitted}
+                    // Allow re-answering if not yet submitted, or if submitted and want to change
+                    disabled={false} 
                     className="space-y-2"
                 >
                   {q.options.map(opt => (
@@ -144,17 +199,22 @@ export default function ListeningPage() {
                     </div>
                   ))}
                 </RadioGroup>
-                {submitted && (
+                {submitted && selectedAnswers[q.id] && ( // Show feedback only if an answer for this question was selected
                     <Alert variant={selectedAnswers[q.id] === q.correctOptionId ? "default" : "destructive"} className="mt-3 text-sm p-2">
                         {selectedAnswers[q.id] === q.correctOptionId ? "Correct!" : `Incorrect. The correct answer was "${q.options.find(o=>o.id === q.correctOptionId)?.text}".`}
+                    </Alert>
+                )}
+                 {submitted && !selectedAnswers[q.id] && ( // If submitted but this question wasn't answered
+                    <Alert variant="destructive" className="mt-3 text-sm p-2">
+                        Please select an answer for this question.
                     </Alert>
                 )}
               </div>
             ))}
           </CardContent>
           <CardFooter>
-            <Button onClick={handleSubmitAnswers} disabled={Object.keys(selectedAnswers).length !== currentExercise.questions.length || submitted} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
-              {submitted ? "Answers Submitted" : "Submit Answers"}
+            <Button onClick={handleSubmitAnswers} disabled={Object.keys(selectedAnswers).length !== currentExercise.questions.length} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+              {submitted ? "Re-Submit Answers" : "Submit Answers"}
             </Button>
           </CardFooter>
         </Card>
