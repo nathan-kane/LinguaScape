@@ -4,134 +4,109 @@
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Headphones, PlayCircle, PauseCircle, FileText, MessageCircleQuestion, ChevronRight } from "lucide-react";
+import { Headphones, PlayCircle, PauseCircle, FileText, MessageCircleQuestion, ChevronRight, Loader2, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast"; // Added import for useToast
-
-// Placeholder data
-const listeningExercises = [
-  {
-    id: "1",
-    title: "Ordering Coffee in Paris",
-    audioUrl: "/audio/placeholder-coffee.mp3", // Placeholder, won't actually play unless file exists in /public/audio
-    language: "French",
-    difficulty: "Beginner",
-    transcript: "Bonjour, je voudrais un café, s'il vous plaît. \nOui, bien sûr. Un café noir ou au lait? \nNoir, s'il vous plaît. \nVoilà. Ça fait deux euros.",
-    questions: [
-      { id: "q1", text: "What did the customer order?", options: [{id: "a", text:"Tea"}, {id: "b", text:"Coffee"}, {id: "c", text:"Croissant"}], correctOptionId: "b" },
-      { id: "q2", text: "How much did it cost?", options: [{id: "a", text:"One euro"}, {id: "b", text:"Two euros"}, {id: "c", text:"Three euros"}], correctOptionId: "b" },
-    ]
-  },
-  {
-    id: "2",
-    title: "Asking for Directions in Madrid",
-    audioUrl: "/audio/placeholder-directions.mp3",
-    language: "Spanish",
-    difficulty: "Beginner",
-    transcript: "Perdona, ¿cómo llego al Museo del Prado? \nSiga todo recto y luego gire a la derecha en la segunda calle. \nMuchas gracias. \nDe nada.",
-    questions: [
-      { id: "q1", text: "What is the person looking for?", options: [{id: "a", text:"A restaurant"}, {id: "b", text:"The Prado Museum"}, {id: "c", text:"A train station"}], correctOptionId: "b" },
-      { id: "q2", text: "What is the second instruction?", options: [{id: "a", text:"Turn left"}, {id: "b", text:"Go straight"}, {id: "c", text:"Turn right"}], correctOptionId: "c" },
-    ]
-  }
-];
+import { useToast } from "@/hooks/use-toast";
+import { useLearning } from "@/context/LearningContext";
+import { mapToBCP47 } from "@/lib/tts-utils";
+import { generateListeningExercise, type GenerateListeningExerciseInput, type GenerateListeningExerciseOutput } from "@/ai/flows/generate-listening-exercise-flow";
 
 export default function ListeningPage() {
-  const [currentExercise, setCurrentExercise] = useState(listeningExercises[0]);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const { selectedLanguage, nativeLanguage, isLoadingPreferences } = useLearning();
+  const { toast } = useToast();
+
+  const [currentExercise, setCurrentExercise] = useState<GenerateListeningExerciseOutput | null>(null);
+  const [isLoadingContent, setIsLoadingContent] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const { toast } = useToast(); // Initialized useToast
+  const [errorLoadingContent, setErrorLoadingContent] = useState<string | null>(null);
 
-  useEffect(() => {
-    const audioElement = audioRef.current;
-    if (audioElement) {
-      const handleAudioEnd = () => {
-        console.log("Audio ended.");
-        setIsPlaying(false);
-      };
-      audioElement.addEventListener('ended', handleAudioEnd);
-      return () => {
-        audioElement.removeEventListener('ended', handleAudioEnd);
-        if (!audioElement.paused) {
-          audioElement.pause();
-        }
-      };
-    }
-  }, [currentExercise.audioUrl]); // Re-bind if audio element might change due to key change
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  const togglePlay = () => {
-    const audioElement = audioRef.current;
-    if (!audioElement) {
-      console.error("Audio element is not available.");
+  const loadNewExercise = useCallback(async () => {
+    if (isLoadingPreferences || !selectedLanguage || !nativeLanguage) return;
+
+    setIsLoadingContent(true);
+    setCurrentExercise(null);
+    setSelectedAnswers({});
+    setSubmitted(false);
+    setShowTranscript(false);
+    setErrorLoadingContent(null);
+    speechSynthesis.cancel(); // Stop any ongoing speech
+
+    try {
+      const input: GenerateListeningExerciseInput = {
+        targetLanguageName: selectedLanguage.name,
+        targetLanguageCode: mapToBCP47(selectedLanguage.code), // For TTS lang hint
+        nativeLanguageName: nativeLanguage.name,
+        difficulty: "beginner", // Or make this selectable later
+      };
+      const exercise = await generateListeningExercise(input);
+      setCurrentExercise(exercise);
+    } catch (error: any) {
+      console.error("Error generating listening exercise:", error);
+      setErrorLoadingContent(error.message || "Failed to load a new listening exercise.");
       toast({
-        title: "Audio Error",
-        description: "Audio player element not found. Cannot play audio.",
+        title: "Content Generation Error",
+        description: error.message || "Could not generate a new listening exercise. Please try again.",
         variant: "destructive",
       });
-      setIsPlaying(false); // Ensure state consistency
+    } finally {
+      setIsLoadingContent(false);
+    }
+  }, [selectedLanguage, nativeLanguage, isLoadingPreferences, toast]);
+
+  useEffect(() => {
+    if (!isLoadingPreferences) {
+      loadNewExercise();
+    }
+    // Cleanup function to cancel speech synthesis when component unmounts or dependencies change
+    return () => {
+      if (speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+      }
+    };
+  }, [loadNewExercise, isLoadingPreferences]);
+
+
+  const togglePlay = () => {
+    if (!currentExercise || !currentExercise.transcript) {
+      toast({ title: "No content", description: "No transcript available to play.", variant: "destructive" });
       return;
     }
 
-    if (isPlaying) {
-      audioElement.pause();
-      setIsPlaying(false);
-      console.log("Audio paused.");
+    if (isSpeaking) {
+      speechSynthesis.cancel();
+      setIsSpeaking(false);
     } else {
-      console.log("Attempting to play audio:", audioElement.src);
-      audioElement.currentTime = 0; // Ensure playback from the start
-      const playPromise = audioElement.play();
+      const utterance = new SpeechSynthesisUtterance(currentExercise.transcript);
+      utterance.lang = mapToBCP47(selectedLanguage.code);
       
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsPlaying(true);
-            console.log("Audio playback started.");
-          })
-          .catch((error) => {
-            console.error("Audio playback error:", error);
-            let description = "Could not play audio. Please ensure the audio file exists at: " + currentExercise.audioUrl;
-            if (error.name === 'NotAllowedError') {
-                 description = "Audio playback was not allowed by the browser. Please ensure you've interacted with the page.";
-            } else if (error.name === 'NotSupportedError') {
-                 description = "The audio format might not be supported or the audio source is invalid/missing: " + currentExercise.audioUrl;
-            } else if (error.message) {
-                description = `Could not play audio: ${error.message}. Path: ${currentExercise.audioUrl}`;
-            }
-            toast({
-              title: "Audio Playback Failed",
-              description: description,
-              variant: "destructive",
-            });
-            setIsPlaying(false);
-          });
-      } else {
-        // This case is highly unlikely with modern browsers.
-        console.warn("audioRef.current.play() did not return a Promise.");
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        console.log("TTS started for lang:", utterance.lang);
+      };
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        console.log("TTS ended.");
+      };
+      utterance.onerror = (event) => {
+        console.error("SpeechSynthesisUtterance.onerror", event);
+        setIsSpeaking(false);
         toast({
-          title: "Audio Warning",
-          description: "Audio playback might be unreliable (play() did not return a promise).",
-          variant: "default",
+          title: "Audio Playback Error",
+          description: `Could not play audio: ${event.error}. Ensure your browser supports TTS for ${selectedLanguage.name}.`,
+          variant: "destructive",
         });
-        try {
-            audioElement.play(); // Attempt synchronous play
-            setIsPlaying(true); // Optimistic update
-        } catch (e: any) {
-            console.error("Fallback play attempt failed:", e);
-            toast({
-              title: "Audio Playback Failed",
-              description: `Fallback audio play attempt failed: ${e.message}`,
-              variant: "destructive",
-            });
-            setIsPlaying(false);
-        }
-      }
+      };
+      utteranceRef.current = utterance;
+      speechSynthesis.speak(utterance);
     }
   };
 
@@ -141,30 +116,59 @@ export default function ListeningPage() {
   };
 
   const handleSubmitAnswers = () => {
+    if (!currentExercise) return;
+    // Check if all questions are answered
+    const allAnswered = currentExercise.questions.every(q => selectedAnswers[q.id]);
+    if (!allAnswered) {
+      toast({
+        title: "Missing Answers",
+        description: "Please answer all questions before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
     setSubmitted(true);
   };
   
-  const loadNextExercise = () => {
-    const currentIndex = listeningExercises.findIndex(ex => ex.id === currentExercise.id);
-    const nextIndex = (currentIndex + 1) % listeningExercises.length;
-    setCurrentExercise(listeningExercises[nextIndex]);
-    setIsPlaying(false);
-    setShowTranscript(false);
-    setSelectedAnswers({});
-    setSubmitted(false);
-    if (audioRef.current) {
-        audioRef.current.pause(); 
-        audioRef.current.currentTime = 0; 
-    }
-  };
-  
-  useEffect(() => {
-    if (audioRef.current) {
-        audioRef.current.load(); 
-        console.log("Audio loaded for new exercise:", currentExercise.audioUrl);
-    }
-  }, [currentExercise.audioUrl]);
+  if (isLoadingPreferences || isLoadingContent) {
+    return (
+      <AuthenticatedLayout>
+        <div className="flex flex-col justify-center items-center h-64 text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+          <p className="text-lg text-muted-foreground">Generating your listening exercise in {selectedLanguage.name}...</p>
+          <p className="text-sm text-muted-foreground">This may take a moment.</p>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
 
+  if (errorLoadingContent && !currentExercise) {
+    return (
+      <AuthenticatedLayout>
+        <Alert variant="destructive" className="max-w-lg mx-auto">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle>Failed to Load Exercise</AlertTitle>
+          <AlertDescription>
+            <p>{errorLoadingContent}</p>
+            <Button onClick={loadNewExercise} variant="outline" size="sm" className="mt-3">
+              Try Again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </AuthenticatedLayout>
+    );
+  }
+
+  if (!currentExercise) {
+    return (
+      <AuthenticatedLayout>
+        <div className="text-center py-10">
+          <p className="text-lg text-muted-foreground">No listening exercise loaded. Try refreshing.</p>
+          <Button onClick={loadNewExercise} className="mt-4">Load Exercise</Button>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
 
   return (
     <AuthenticatedLayout>
@@ -174,7 +178,7 @@ export default function ListeningPage() {
             Contextual Listener
           </h1>
           <p className="text-lg text-muted-foreground">
-            Improve your comprehension with real-life audio scenarios.
+            Improve your {currentExercise.languageName} comprehension with AI-generated scenarios.
           </p>
         </section>
 
@@ -186,21 +190,18 @@ export default function ListeningPage() {
                         <Headphones className="h-7 w-7 text-primary" />
                         {currentExercise.title}
                     </CardTitle>
-                    <CardDescription>Language: {currentExercise.language} | Difficulty: {currentExercise.difficulty}</CardDescription>
+                    <CardDescription>Language: {currentExercise.languageName} | Difficulty: {currentExercise.difficulty}</CardDescription>
                 </div>
-                <Button onClick={loadNextExercise} variant="outline" className="mt-2 sm:mt-0">
+                <Button onClick={loadNewExercise} variant="outline" className="mt-2 sm:mt-0" disabled={isLoadingContent || isSpeaking}>
                     Next Exercise <ChevronRight className="ml-1 h-5 w-5"/>
                 </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-center p-6 bg-secondary rounded-lg">
-              {/* Key change: Adding key={currentExercise.audioUrl} ensures React re-creates the audio element 
-                  when the src changes, which helps with reliable ref updates and event listeners. */}
-              <audio ref={audioRef} src={currentExercise.audioUrl} key={currentExercise.audioUrl} hidden />
-              <Button onClick={togglePlay} size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground">
-                {isPlaying ? <PauseCircle className="mr-2 h-6 w-6" /> : <PlayCircle className="mr-2 h-6 w-6" />}
-                {isPlaying ? "Pause Audio" : "Play Audio"}
+              <Button onClick={togglePlay} size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoadingContent}>
+                {isSpeaking ? <PauseCircle className="mr-2 h-6 w-6" /> : <PlayCircle className="mr-2 h-6 w-6" />}
+                {isSpeaking ? "Pause Audio" : "Play Audio"}
               </Button>
             </div>
 
@@ -219,52 +220,52 @@ export default function ListeningPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-md bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageCircleQuestion className="h-6 w-6 text-accent" />
-              Comprehension Questions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {currentExercise.questions.map((q, index) => (
-              <div key={q.id} className="p-4 border rounded-lg bg-background">
-                <p className="font-semibold mb-3 text-foreground">{index + 1}. {q.text}</p>
-                <RadioGroup 
-                    value={selectedAnswers[q.id] || ""}
-                    onValueChange={(value) => handleAnswerChange(q.id, value)}
-                    disabled={false} 
-                    className="space-y-2"
-                >
-                  {q.options.map(opt => (
-                    <div key={opt.id} className="flex items-center space-x-2 p-2 rounded hover:bg-secondary/50 transition-colors">
-                      <RadioGroupItem value={opt.id} id={`${q.id}-${opt.id}`} />
-                      <Label htmlFor={`${q.id}-${opt.id}`} className="cursor-pointer flex-1">{opt.text}</Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-                {submitted && selectedAnswers[q.id] && ( 
-                    <Alert variant={selectedAnswers[q.id] === q.correctOptionId ? "default" : "destructive"} className="mt-3 text-sm p-2">
-                        {selectedAnswers[q.id] === q.correctOptionId ? "Correct!" : `Incorrect. The correct answer was "${q.options.find(o=>o.id === q.correctOptionId)?.text}".`}
-                    </Alert>
-                )}
-                 {submitted && !selectedAnswers[q.id] && ( 
-                    <Alert variant="destructive" className="mt-3 text-sm p-2">
-                        Please select an answer for this question.
-                    </Alert>
-                )}
-              </div>
-            ))}
-          </CardContent>
-          <CardFooter>
-            <Button onClick={handleSubmitAnswers} disabled={Object.keys(selectedAnswers).length !== currentExercise.questions.length} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
-              {submitted ? "Re-Submit Answers" : "Submit Answers"}
-            </Button>
-          </CardFooter>
-        </Card>
-
+        {currentExercise.questions && currentExercise.questions.length > 0 && (
+          <Card className="shadow-md bg-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircleQuestion className="h-6 w-6 text-accent" />
+                Comprehension Questions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {currentExercise.questions.map((q, index) => (
+                <div key={q.id} className="p-4 border rounded-lg bg-background">
+                  <p className="font-semibold mb-3 text-foreground">{index + 1}. {q.text}</p>
+                  <RadioGroup 
+                      value={selectedAnswers[q.id] || ""}
+                      onValueChange={(value) => handleAnswerChange(q.id, value)}
+                      disabled={submitted} 
+                      className="space-y-2"
+                  >
+                    {q.options.map(opt => (
+                      <div key={opt.id} className="flex items-center space-x-2 p-2 rounded hover:bg-secondary/50 transition-colors">
+                        <RadioGroupItem value={opt.id} id={`${q.id}-${opt.id}`} />
+                        <Label htmlFor={`${q.id}-${opt.id}`} className="cursor-pointer flex-1">{opt.text}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                  {submitted && selectedAnswers[q.id] && ( 
+                      <Alert variant={selectedAnswers[q.id] === q.correctOptionId ? "default" : "destructive"} className="mt-3 text-sm p-2">
+                          {selectedAnswers[q.id] === q.correctOptionId ? "Correct!" : `Incorrect. The correct answer was "${q.options.find(o=>o.id === q.correctOptionId)?.text}".`}
+                      </Alert>
+                  )}
+                  {submitted && !selectedAnswers[q.id] && ( 
+                      <Alert variant="destructive" className="mt-3 text-sm p-2">
+                          Please select an answer for this question.
+                      </Alert>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+            <CardFooter>
+              <Button onClick={handleSubmitAnswers} disabled={Object.keys(selectedAnswers).length !== currentExercise.questions.length || submitted} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+                Submit Answers
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
       </div>
     </AuthenticatedLayout>
   );
 }
-
