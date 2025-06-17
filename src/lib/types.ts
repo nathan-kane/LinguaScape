@@ -156,8 +156,25 @@ export interface DailyWordItem {
   audioUrl?: string;
   exampleSentence?: string;
   wordType: 'noun' | 'verb' | 'adjective' | 'phrase' | 'other';
+  dataAiHint?: string; // Added for AI image generation hints
 }
 
+// Represents a word with user progress for display in the vocabulary session
+export interface SessionWordItem extends DailyWordItem {
+  // Include relevant progress properties from UserWordProgress
+  status: 'new' | 'learning' | 'review' | 'mastered'; // SRS status
+  fluency: number; // Calculated proficiency (0-100)
+  lastReviewedAt: number; // Timestamp (milliseconds since epoch)
+  nextReviewAt: number; // Timestamp (milliseconds since epoch) for next SRS review
+  currentIntervalDays: number; // SRS: current interval in days
+  easeFactor: number; // SRS: ease factor
+  repetitions: number; // SRS: consecutive successful reviews
+  lapses: number; // SRS: times forgotten after becoming 'learning' or 'review'
+  totalTimesSeen: number;
+  totalCorrect: number;
+  totalIncorrect: number;
+  firstLearnedAt?: number; // Timestamp when the word was first encountered/passed 'new'
+}
 // Represents a chat message in the AI conversation
 export interface ChatMessage {
   id: string;

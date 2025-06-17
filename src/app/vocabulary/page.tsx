@@ -2,14 +2,17 @@
 "use client";
 
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// Assuming you have a Genkit client initialized and imported somewhere that provides Firestore access
+import { getFirestore, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+// import { genkitClient } from "@/lib/genkitClient"; // Example import
 import { Button } from "@/components/ui/button";
 import { Zap, BookOpen, PlusCircle, ListChecks, HelpCircle, ChevronRight, RefreshCw } from "lucide-react";
 import Link from "next/link";
 // import Image from "next/image"; // Not used in current component structure
 import { useState, useEffect, useCallback } from "react"; 
-import { useLearning } from '@/context/LearningContext';
-import type { DailyWordItem } from '@/lib/types';
+import { useLearning } from "@/context/LearningContext";
+import type { DailyWordItem, UserWordProgress } from '@/lib/types';
+import type { SessionWordItem } from '@/lib/types';
 
 // Updated FlashcardPlaceholder component
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example?: string, showBack: boolean }) => (
@@ -138,28 +141,179 @@ export default function VocabularyPage() {
   const { selectedLanguage, selectedMode, isLoadingPreferences } = useLearning();
   
   const [sessionWords, setSessionWords] = useState<DailyWordItem[]>([]);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [currentCardIndex, setCurrentCardIndex] = useState<number>(0);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [totalWordsInCurrentPool, setTotalWordsInCurrentPool] = useState(0);
   const [masteredWordIds, setMasteredWordIds] = useState<Set<string>>(new Set());
 
 
-  const loadNewSessionWords = useCallback(() => {
+  const loadNewSessionWords = useCallback(async () => {
     if (!isLoadingPreferences && selectedLanguage && selectedMode) {
       setIsLoadingSession(true);
-      const allWordsForContext = getVocabularySessionWords(selectedLanguage.code, selectedMode.id);
       
-      setTotalWordsInCurrentPool(allWordsForContext.length);
-      setMasteredWordIds(new Set()); // Reset session mastery count
+      // Assume userId is available, e.g., from an authentication context
+      const userId = 'YOUR_USER_ID'; // **Replace with actual user ID**
 
-      const shuffledWords = shuffleArray(allWordsForContext);
-      setSessionWords(shuffledWords.slice(0, WORDS_PER_SESSION));
-      
-      setCurrentCardIndex(0);
-      setShowBack(false);
-      setIsLoadingSession(false);
+      try {
+        // 1. Call generateVocabularyFlow using the Genkit client
+        // You will need to replace `genkitClient.runFlow` with your actual method
+        const generatedVocabulary = await (window as any).genkitClient.runFlow('generateVocabularyFlow', { // Using window as a temporary placeholder for a global client
+          languageCode: selectedLanguage.code,
+
+          modeId: selectedMode.id,
+        });
+
+        if (!generatedVocabulary || generatedVocabulary.vocabulary.length === 0) {
+          console.warn("AI flow did not return any vocabulary.");
+           setSessionWords([]);
+           setTotalWordsInCurrentPool(0);
+           setMasteredWordIds(new Set());
+           setIsLoadingSession(false);
+           return;
+        }
+
+        const generatedWordItems: DailyWordItem[] = generatedVocabulary.vocabulary;
+        const generatedWordIds = generatedWordItems.map(word => word.wordBankId);
+
+        // 3. Call getUserWordProgress to check for existing progress
+        // Placeholder for database interaction
+        // You will need to implement getUserWordProgress based on your database
+        const existingProgress = await getUserWordProgress(userId, generatedWordIds);
+
+        const existingProgressMap = new Map(existingProgress.map(p => [p.wordBankId, p]));
+        const wordsToSave: UserWordProgress[] = []; // For new progress entries to save
+        const sessionWordItems: SessionWordItem[] = []; // For words to display in the session
+
+        // 4 & 5. Process results and create new entries
+        // Explicitly type 'word' as DailyWordItem
+        for (const word of generatedWordItems) {
+          const existing = existingProgressMap.get(word.wordBankId);
+          if (existing) {
+            // Word has existing progress, combine AI data with existing progress for session display
+            const sessionItem: SessionWordItem = {
+               // Include all properties from DailyWordItem
+               ...word,
+
+               // Explicitly include relevant progress properties from existing UserWordProgress
+               status: existing.status,
+               fluency: existing.fluency,
+               lastReviewedAt: existing.lastReviewedAt,
+               nextReviewAt: existing.nextReviewAt,
+               currentIntervalDays: existing.currentIntervalDays,
+               easeFactor: existing.easeFactor,
+               repetitions: existing.repetitions,
+               lapses: existing.lapses,
+               totalTimesSeen: existing.totalTimesSeen,
+               totalCorrect: existing.totalCorrect,
+               totalIncorrect: existing.totalIncorrect,
+               firstLearnedAt: existing.firstLearnedAt,
+               // Assuming id, userId, languageCode are also needed for SessionWordItem from UserWordProgress
+               id: existing.id,
+               userId: existing.userId,
+               languageCode: existing.languageCode,
+            });
+            sessionWordItems.push(sessionItem);
+          } else {
+            // Word is new, create a new UserWordProgress entry
+            // id will be generated by Firestore if not explicitly set
+            const newUserProgress: UserWordProgress = {
+              // id will be generated by Firestore if not explicitly set
+              userId: userId,
+              wordBankId: word.wordBankId,
+              languageCode: selectedLanguage.code, // Include language code
+              status: 'new', // Initial status
+              fluency: 0, // Initial fluency
+              lastReviewedAt: Date.now(), // Initial review time
+              nextReviewAt: Date.now(), // Initial next review time
+              currentIntervalDays: 0, // Initial interval
+              easeFactor: 2.5, // Initial ease factor (standard Anki default)
+              repetitions: 0, // Initial repetitions
+              lapses: 0, // Initial lapses
+              totalTimesSeen: 0, // Initial total times seen
+              totalCorrect: 0, // Initial total correct
+              totalIncorrect: 0, // Initial total incorrect
+            };
+
+            wordsToSave.push(newUserProgress);
+
+             sessionWordItems.push({
+               ...word, // Include all properties from DailyWordItem
+
+               // Explicitly include relevant progress properties from newUserProgress
+                status: newUserProgress.status,
+               fluency: newUserProgress.fluency,
+               lastReviewedAt: newUserProgress.lastReviewedAt,
+               nextReviewAt: newUserProgress.nextReviewAt,
+               currentIntervalDays: newUserProgress.currentIntervalDays,
+               easeFactor: newUserProgress.easeFactor,
+               repetitions: newUserProgress.repetitions,
+               lapses: newUserProgress.lapses,
+                totalTimesSeen: newUserProgress.totalTimesSeen,
+               totalCorrect: newUserProgress.totalCorrect,
+               totalIncorrect: newUserProgress.totalIncorrect,
+               firstLearnedAt: newUserProgress.firstLearnedAt,
+               // Assuming id, userId, languageCode are also needed for SessionWordItem from UserWordProgress
+               id: newUserProgress.id, // Will be undefined initially, but will be populated after saving
+               userId: newUserProgress.userId,
+               languageCode: newUserProgress.languageCode,
+            });
+
+          }
+
+
+        }
+
+        // 6. Call saveUserWordProgress with new entries
+        // Placeholder for database interaction
+        // You will need to implement saveUserWordProgress based on your database
+        if (wordsToSave.length > 0) {
+          await saveUserWordProgress(wordsToSave);
+        }
+
+        // 7. Combine generated data with progress (already done in loop)
+        // 8. Update state
+        const shuffledSessionWords = shuffleArray(sessionWordItems);
+        setSessionWords(shuffledSessionWords.slice(0, WORDS_PER_SESSION)); // Take only the session subset
+
+        // Update total words based on the potentially expanded set from AI + existing
+        setTotalWordsInCurrentPool(sessionWordItems.length);
+        setMasteredWordIds(new Set()); // Reset session mastery count
+
+        setCurrentCardIndex(0);
+        setShowBack(false);
+
+      } catch (error) {
+        console.error("Error loading vocabulary session:", error);
+        // Handle error state, maybe show a message to the user
+         setSessionWords([]);
+         setTotalWordsInCurrentPool(0);
+         setMasteredWordIds(new Set());
+      } finally {
+        setIsLoadingSession(false);
+      }
     }
   }, [selectedLanguage, selectedMode, isLoadingPreferences]);
+
+ // Placeholder function - Replace with your actual database implementation
+  const getUserWordProgress = async (userId: string, wordIdentifiers: string[]): Promise<UserWordProgress[]> => {
+    console.log(`[DB Placeholder] Fetching progress for user ${userId} and words: ${wordIdentifiers.join(', ')}`);
+    // Implement your database query here
+    // Example: return db.collection('userWordProgress').where('userId', '==', userId).where('wordBankId', 'in', wordIdentifiers).get();
+    return []; // Return empty array as a placeholder
+  };
+
+   // Placeholder function - Replace with your actual database implementation
+  const saveUserWordProgress = async (progressEntries: UserWordProgress[]): Promise<void> => {
+    console.log(`[DB Placeholder] Saving progress for ${progressEntries.length} words.`);
+    // Implement your database save/update logic here
+    // Example: Use batch writes for efficiency
+    // const batch = db.batch();
+    // progressEntries.forEach(entry => {
+    //   const docRef = db.collection('userWordProgress').doc(`${entry.userId}_${entry.wordBankId}`); // Example doc ID
+    //   batch.set(docRef, entry, { merge: true }); // Use merge to update if exists, create if not
+    // });
+    // await batch.commit();
+  };
 
   useEffect(() => {
     loadNewSessionWords();
