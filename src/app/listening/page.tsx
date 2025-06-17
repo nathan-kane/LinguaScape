@@ -38,14 +38,24 @@ export default function ListeningPage() {
     setSubmitted(false);
     setShowTranscript(false);
     setErrorLoadingContent(null);
-    speechSynthesis.cancel(); // Stop any ongoing speech
+    
+    if (speechSynthesis.speaking || speechSynthesis.pending) {
+        speechSynthesis.cancel();
+        setIsSpeaking(false);
+    }
+    if (utteranceRef.current) {
+        utteranceRef.current.onend = null;
+        utteranceRef.current.onerror = null;
+        utteranceRef.current.onstart = null;
+    }
+
 
     try {
       const input: GenerateListeningExerciseInput = {
         targetLanguageName: selectedLanguage.name,
-        targetLanguageCode: mapToBCP47(selectedLanguage.code), // For TTS lang hint
+        targetLanguageCode: mapToBCP47(selectedLanguage.code), 
         nativeLanguageName: nativeLanguage.name,
-        difficulty: "beginner", // Or make this selectable later
+        difficulty: "beginner", 
       };
       const exercise = await generateListeningExercise(input);
       setCurrentExercise(exercise);
@@ -66,10 +76,14 @@ export default function ListeningPage() {
     if (!isLoadingPreferences) {
       loadNewExercise();
     }
-    // Cleanup function to cancel speech synthesis when component unmounts or dependencies change
     return () => {
-      if (speechSynthesis.speaking) {
+      if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
+      }
+      if (utteranceRef.current) {
+          utteranceRef.current.onend = null; // Important to remove listeners to prevent memory leaks
+          utteranceRef.current.onerror = null;
+          utteranceRef.current.onstart = null;
       }
     };
   }, [loadNewExercise, isLoadingPreferences]);
@@ -85,18 +99,25 @@ export default function ListeningPage() {
       speechSynthesis.cancel();
       setIsSpeaking(false);
     } else {
-      const utterance = new SpeechSynthesisUtterance(currentExercise.transcript);
-      utterance.lang = mapToBCP47(selectedLanguage.code);
+      // Ensure any previous utterance listeners are cleared before creating a new one
+      if (utteranceRef.current) {
+        utteranceRef.current.onend = null;
+        utteranceRef.current.onerror = null;
+        utteranceRef.current.onstart = null;
+      }
+
+      const newUtterance = new SpeechSynthesisUtterance(currentExercise.transcript);
+      newUtterance.lang = mapToBCP47(selectedLanguage.code);
       
-      utterance.onstart = () => {
+      newUtterance.onstart = () => {
         setIsSpeaking(true);
-        console.log("TTS started for lang:", utterance.lang);
+        console.log("TTS started for lang:", newUtterance.lang, "Text:", currentExercise.transcript.substring(0,50)+"...");
       };
-      utterance.onend = () => {
+      newUtterance.onend = () => {
         setIsSpeaking(false);
         console.log("TTS ended.");
       };
-      utterance.onerror = (event) => {
+      newUtterance.onerror = (event) => {
         console.error("SpeechSynthesisUtterance.onerror", event);
         setIsSpeaking(false);
         toast({
@@ -105,8 +126,9 @@ export default function ListeningPage() {
           variant: "destructive",
         });
       };
-      utteranceRef.current = utterance;
-      speechSynthesis.speak(utterance);
+      
+      utteranceRef.current = newUtterance;
+      speechSynthesis.speak(utteranceRef.current);
     }
   };
 
@@ -117,7 +139,6 @@ export default function ListeningPage() {
 
   const handleSubmitAnswers = () => {
     if (!currentExercise) return;
-    // Check if all questions are answered
     const allAnswered = currentExercise.questions.every(q => selectedAnswers[q.id]);
     if (!allAnswered) {
       toast({
@@ -269,3 +290,5 @@ export default function ListeningPage() {
     </AuthenticatedLayout>
   );
 }
+
+    
