@@ -41,13 +41,14 @@ export default function ListeningPage() {
     
     if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
-        setIsSpeaking(false);
     }
     if (utteranceRef.current) {
+        utteranceRef.current.onstart = null;
         utteranceRef.current.onend = null;
         utteranceRef.current.onerror = null;
-        utteranceRef.current.onstart = null;
+        utteranceRef.current = null; 
     }
+    setIsSpeaking(false);
 
 
     try {
@@ -73,58 +74,82 @@ export default function ListeningPage() {
   }, [selectedLanguage, nativeLanguage, isLoadingPreferences, toast]);
 
   useEffect(() => {
+    if (!('speechSynthesis' in window)) {
+      toast({
+        title: "TTS Not Supported",
+        description: "Your browser does not support Text-to-Speech.",
+        variant: "destructive",
+      });
+      setErrorLoadingContent("Text-to-Speech is not supported by your browser.");
+      setIsLoadingContent(false);
+      return;
+    }
+
     if (!isLoadingPreferences) {
       loadNewExercise();
     }
-    return () => {
+    
+    return () => { // Cleanup function
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
       }
       if (utteranceRef.current) {
-          utteranceRef.current.onend = null; // Important to remove listeners to prevent memory leaks
-          utteranceRef.current.onerror = null;
           utteranceRef.current.onstart = null;
+          utteranceRef.current.onend = null;
+          utteranceRef.current.onerror = null;
       }
     };
-  }, [loadNewExercise, isLoadingPreferences]);
+  }, [loadNewExercise, isLoadingPreferences, toast]);
 
 
   const togglePlay = () => {
-    if (!currentExercise || !currentExercise.transcript) {
-      toast({ title: "No content", description: "No transcript available to play.", variant: "destructive" });
+    if (!currentExercise || !currentExercise.transcript || currentExercise.transcript.trim() === "") {
+      toast({ 
+        title: "No Content to Play", 
+        description: "The current exercise has no audio transcript available.", 
+        variant: "destructive" 
+      });
+      setIsSpeaking(false);
       return;
     }
 
     if (isSpeaking) {
-      speechSynthesis.cancel();
-      setIsSpeaking(false);
+      speechSynthesis.cancel(); // This will trigger onend or onerror for the current utterance
+      // setIsSpeaking will be set to false by the onend/onerror handlers of the cancelled utterance
     } else {
-      // Ensure any previous utterance listeners are cleared before creating a new one
+      // Clear any previous utterance's listeners from the ref if it exists and is different
       if (utteranceRef.current) {
+        utteranceRef.current.onstart = null;
         utteranceRef.current.onend = null;
         utteranceRef.current.onerror = null;
-        utteranceRef.current.onstart = null;
       }
+      speechSynthesis.cancel(); // Ensure queue is clear
 
       const newUtterance = new SpeechSynthesisUtterance(currentExercise.transcript);
       newUtterance.lang = mapToBCP47(selectedLanguage.code);
       
       newUtterance.onstart = () => {
+        console.log("TTS started for lang:", newUtterance.lang);
         setIsSpeaking(true);
-        console.log("TTS started for lang:", newUtterance.lang, "Text:", currentExercise.transcript.substring(0,50)+"...");
       };
       newUtterance.onend = () => {
-        setIsSpeaking(false);
         console.log("TTS ended.");
+        setIsSpeaking(false);
+        if (utteranceRef.current === newUtterance) { // Only nullify if it's the same utterance
+            utteranceRef.current = null;
+        }
       };
-      newUtterance.onerror = (event) => {
-        console.error("SpeechSynthesisUtterance.onerror", event);
+      newUtterance.onerror = (event: SpeechSynthesisErrorEvent) => {
+        console.error("SpeechSynthesisUtterance.onerror - ErrorType:", event.error, "FullEvent:", event);
         setIsSpeaking(false);
         toast({
           title: "Audio Playback Error",
-          description: `Could not play audio: ${event.error}. Ensure your browser supports TTS for ${selectedLanguage.name}.`,
+          description: `Could not play audio for ${selectedLanguage.name}. Error: ${event.error || 'Unknown speech error'}. Check browser console for more details.`,
           variant: "destructive",
         });
+         if (utteranceRef.current === newUtterance) {
+            utteranceRef.current = null;
+        }
       };
       
       utteranceRef.current = newUtterance;
@@ -171,9 +196,11 @@ export default function ListeningPage() {
           <AlertTitle>Failed to Load Exercise</AlertTitle>
           <AlertDescription>
             <p>{errorLoadingContent}</p>
-            <Button onClick={loadNewExercise} variant="outline" size="sm" className="mt-3">
-              Try Again
-            </Button>
+            {errorLoadingContent !== "Text-to-Speech is not supported by your browser." && (
+                <Button onClick={loadNewExercise} variant="outline" size="sm" className="mt-3">
+                Try Again
+                </Button>
+            )}
           </AlertDescription>
         </Alert>
       </AuthenticatedLayout>
@@ -220,7 +247,7 @@ export default function ListeningPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-center p-6 bg-secondary rounded-lg">
-              <Button onClick={togglePlay} size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoadingContent}>
+              <Button onClick={togglePlay} size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoadingContent || !currentExercise.transcript || currentExercise.transcript.trim() === ""}>
                 {isSpeaking ? <PauseCircle className="mr-2 h-6 w-6" /> : <PlayCircle className="mr-2 h-6 w-6" />}
                 {isSpeaking ? "Pause Audio" : "Play Audio"}
               </Button>
@@ -290,5 +317,4 @@ export default function ListeningPage() {
     </AuthenticatedLayout>
   );
 }
-
     
