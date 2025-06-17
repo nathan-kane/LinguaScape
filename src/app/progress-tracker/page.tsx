@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Zap, Target, BookOpen, Repeat, CalendarDays, TrendingUp, AlertCircle } from "lucide-react";
+import { BarChart3, Zap, Target, BookOpen, Repeat, CalendarDays, TrendingUp, AlertCircle, RefreshCw } from "lucide-react"; // Added RefreshCw
 import { Progress } from "@/components/ui/progress";
 import { useLearning } from '@/context/LearningContext';
 import Image from 'next/image';
@@ -14,7 +14,7 @@ import {
   type GenerateVocabularyInput,
   type GenerateVocabularyResult 
 } from '@/ai/flows/generate-vocabulary-flow';
-import type { DailyWordItem } from '@/lib/types'; // Re-using DailyWordItem from types
+import type { DailyWordItem } from '@/lib/types'; 
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -263,12 +263,3 @@ export default function ProgressTrackerPage() {
     </AuthenticatedLayout>
   );
 }
-
-// Small helper for Progress component indicator color, if needed directly (alternative to cn in-place)
-// const getFluencyColorClass = (fluency: number): string => {
-//   if (fluency < 40) return 'bg-red-500';
-//   if (fluency < 70) return 'bg-yellow-500';
-//   return 'bg-green-500';
-// };
-// Inside Progress: indicatorClassName={getFluencyColorClass(word.fluency)}
-
