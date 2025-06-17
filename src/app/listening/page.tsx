@@ -61,7 +61,7 @@ export default function ListeningPage() {
         }
       };
     }
-  }, [currentExercise.audioUrl]); // Re-run if the audio source changes
+  }, [currentExercise.audioUrl]); 
 
 
   const togglePlay = () => {
@@ -80,18 +80,21 @@ export default function ListeningPage() {
             setIsPlaying(false); 
           });
         } else {
+           // This branch should ideally not be hit with modern .play() API
+           console.error("audioRef.current.play() did not return a Promise.");
            alert("Audio playback is simulated (play() did not return a promise). Ensure valid audio files in a real app.");
            setIsPlaying(false);
         }
       }
     } else {
-        alert("Audio element not available.");
+        console.error("audioRef.current is null or undefined. Cannot play audio.");
+        alert("Audio element not available. Cannot play audio.");
     }
   };
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
     setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
-    setSubmitted(false); // Allow re-submission if an answer is changed
+    setSubmitted(false); 
   };
 
   const handleSubmitAnswers = () => {
@@ -107,17 +110,14 @@ export default function ListeningPage() {
     setSelectedAnswers({});
     setSubmitted(false);
     if (audioRef.current) {
-        audioRef.current.pause(); // Stop previous audio
-        audioRef.current.currentTime = 0; // Reset time
-        // audioRef.current.load(); // Some browsers might need this if src changes dynamically (handled by currentExercise.audioUrl in key for audio element)
+        audioRef.current.pause(); 
+        audioRef.current.currentTime = 0; 
     }
   };
   
   useEffect(() => {
-    // If currentExercise changes, we want to ensure the audio element reloads its source.
-    // The 'key' prop on the audio element helps achieve this.
     if (audioRef.current) {
-        audioRef.current.load(); // Explicitly load new source
+        audioRef.current.load(); 
     }
   }, [currentExercise.audioUrl]);
 
@@ -151,7 +151,6 @@ export default function ListeningPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-center p-6 bg-secondary rounded-lg">
-              {/* By adding a key, React will re-create the audio element when audioUrl changes, ensuring new source loading */}
               <audio ref={audioRef} src={currentExercise.audioUrl} key={currentExercise.audioUrl} hidden />
               <Button onClick={togglePlay} size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isPlaying ? <PauseCircle className="mr-2 h-6 w-6" /> : <PlayCircle className="mr-2 h-6 w-6" />}
@@ -188,7 +187,6 @@ export default function ListeningPage() {
                 <RadioGroup 
                     value={selectedAnswers[q.id] || ""}
                     onValueChange={(value) => handleAnswerChange(q.id, value)}
-                    // Allow re-answering if not yet submitted, or if submitted and want to change
                     disabled={false} 
                     className="space-y-2"
                 >
@@ -199,12 +197,12 @@ export default function ListeningPage() {
                     </div>
                   ))}
                 </RadioGroup>
-                {submitted && selectedAnswers[q.id] && ( // Show feedback only if an answer for this question was selected
+                {submitted && selectedAnswers[q.id] && ( 
                     <Alert variant={selectedAnswers[q.id] === q.correctOptionId ? "default" : "destructive"} className="mt-3 text-sm p-2">
                         {selectedAnswers[q.id] === q.correctOptionId ? "Correct!" : `Incorrect. The correct answer was "${q.options.find(o=>o.id === q.correctOptionId)?.text}".`}
                     </Alert>
                 )}
-                 {submitted && !selectedAnswers[q.id] && ( // If submitted but this question wasn't answered
+                 {submitted && !selectedAnswers[q.id] && ( 
                     <Alert variant="destructive" className="mt-3 text-sm p-2">
                         Please select an answer for this question.
                     </Alert>
