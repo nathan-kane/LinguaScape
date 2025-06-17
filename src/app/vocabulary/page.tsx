@@ -7,13 +7,12 @@ import { Zap, BookOpen, PlusCircle, ListChecks, HelpCircle, ChevronRight, Refres
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react"; 
 import { useLearning } from "@/context/LearningContext";
-import type { DailyWordItem, UserWordProgress, SessionWordItem } from '@/lib/types'; // Ensure SessionWordItem is used or defined if different from DailyWordItem + progress
+import type { DailyWordItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   generateVocabulary,
   type GenerateVocabularyInput,
-  // type GenerateVocabularyOutput, // This was for the LLM direct output
-  type GenerateVocabularyResult, // This is the final output of our wrapper
+  type GenerateVocabularyResult,
 } from '@/ai/flows/generate-vocabulary-flow';
 import { useToast } from "@/hooks/use-toast";
 
@@ -47,14 +46,14 @@ function shuffleArray<T>(array: T[]): T[] {
 // Fallback placeholder data generator
 const getVocabularySessionWordsFallback = (languageCode: string, modeId: string, nativeLanguageName: string): DailyWordItem[] => {
   const commonProps = { imageUrl: "https://placehold.co/200x150.png", audioUrl: "#" };
-  let baseWords: Omit<DailyWordItem, 'translation'> & { translations: Record<string, string> }[] = [];
+  let baseWords: Omit<DailyWordItem, 'translation'> & { translations: Record<string, string>, _simulatedMastery?: boolean }[] = [];
+  
   // Using English as the key for translations for simplicity in placeholder
   if (languageCode === 'es') {
     baseWords = [
-      { wordBankId: "es_v1", word: "Amigo/Amiga", translations: { en: "Friend"}, exampleSentence: "Ella es mi amiga.", wordType: "noun", dataAiHint: "friends talking", ...commonProps },
-      { wordBankId: "es_v2", word: "Feliz", translations: { en: "Happy"}, exampleSentence: "Estoy feliz hoy.", wordType: "adjective", dataAiHint: "smiling face", ...commonProps },
-      { wordBankId: "es_v3", word: "Trabajar", translations: { en: "To work"}, exampleSentence: "Necesito trabajar mañana.", wordType: "verb", dataAiHint: "person working", ...commonProps },
-      // ... add more Spanish words up to 15
+      { wordBankId: "es_v1", word: "Amigo/Amiga", translations: { en: "Friend"}, exampleSentence: "Ella es mi amiga.", wordType: "noun", dataAiHint: "friends talking", ...commonProps, _simulatedMastery: true },
+      { wordBankId: "es_v2", word: "Feliz", translations: { en: "Happy"}, exampleSentence: "Estoy feliz hoy.", wordType: "adjective", dataAiHint: "smiling face", ...commonProps, _simulatedMastery: true },
+      { wordBankId: "es_v3", word: "Trabajar", translations: { en: "To work"}, exampleSentence: "Necesito trabajar mañana.", wordType: "verb", dataAiHint: "person working", ...commonProps, _simulatedMastery: true },
       { wordBankId: "es_v4", word: "Libro", translations: { en: "Book" }, exampleSentence: "Leo un libro interesante.", wordType: "noun", dataAiHint: "open book", ...commonProps },
       { wordBankId: "es_v5", word: "Ciudad", translations: { en: "City" }, exampleSentence: "Me gusta esta ciudad grande y hermosa.", wordType: "noun", dataAiHint: "city skyline", ...commonProps },
       { wordBankId: "es_v6", word: "Comida", translations: { en: "Food" }, exampleSentence: "La comida está deliciosa.", wordType: "noun", dataAiHint: "delicious food", ...commonProps },
@@ -70,10 +69,9 @@ const getVocabularySessionWordsFallback = (languageCode: string, modeId: string,
     ];
   } else if (languageCode === 'fr') {
     baseWords = [
-      { wordBankId: "fr_v1", word: "Ami/Amie", translations: { en: "Friend"}, exampleSentence: "Il est mon meilleur ami.", wordType: "noun", dataAiHint: "friends together", ...commonProps },
-      { wordBankId: "fr_v2", word: "Content/Contente", translations: { en: "Happy"}, exampleSentence: "Je suis très content de te voir.", wordType: "adjective", dataAiHint: "joyful expression", ...commonProps },
-      // ... add more French words
-      { wordBankId: "fr_v3", word: "Travailler", translations: { en: "To work"}, exampleSentence: "Je dois travailler dur pour réussir.", wordType: "verb", dataAiHint: "desk work", ...commonProps },
+      { wordBankId: "fr_v1", word: "Ami/Amie", translations: { en: "Friend"}, exampleSentence: "Il est mon meilleur ami.", wordType: "noun", dataAiHint: "friends together", ...commonProps, _simulatedMastery: true },
+      { wordBankId: "fr_v2", word: "Content/Contente", translations: { en: "Happy"}, exampleSentence: "Je suis très content de te voir.", wordType: "adjective", dataAiHint: "joyful expression", ...commonProps, _simulatedMastery: true },
+      { wordBankId: "fr_v3", word: "Travailler", translations: { en: "To work"}, exampleSentence: "Je dois travailler dur pour réussir.", wordType: "verb", dataAiHint: "desk work", ...commonProps, _simulatedMastery: true },
       { wordBankId: "fr_v4", word: "Livre", translations: { en: "Book"}, exampleSentence: "C'est un livre passionnant à lire.", wordType: "noun", dataAiHint: "stack books", ...commonProps },
       { wordBankId: "fr_v5", word: "Ville", translations: { en: "City"}, exampleSentence: "Paris est une ville magnifique.", wordType: "noun", dataAiHint: "paris city", ...commonProps },
       { wordBankId: "fr_v6", word: "Nourriture", translations: { en: "Food"}, exampleSentence: "J'aime la nourriture française authentique.", wordType: "noun", dataAiHint: "french food", ...commonProps },
@@ -89,9 +87,8 @@ const getVocabularySessionWordsFallback = (languageCode: string, modeId: string,
     ];
   } else if (languageCode === 'ua') {
      baseWords = [
-      { wordBankId: "ua_v1", word: "Друг/Подруга", translations: { en: "Friend"}, exampleSentence: "Він мій найкращий і найнадійніший друг.", wordType: "noun", dataAiHint: "best friends", ...commonProps },
-      // ... add more Ukrainian words
-      { wordBankId: "ua_v2", word: "Щасливий/Щаслива", translations: { en: "Happy"}, exampleSentence: "Я дуже щаслива сьогодні ввечері.", wordType: "adjective", dataAiHint: "person happy", ...commonProps },
+      { wordBankId: "ua_v1", word: "Друг/Подруга", translations: { en: "Friend"}, exampleSentence: "Він мій найкращий і найнадійніший друг.", wordType: "noun", dataAiHint: "best friends", ...commonProps, _simulatedMastery: true },
+      { wordBankId: "ua_v2", word: "Щасливий/Щаслива", translations: { en: "Happy"}, exampleSentence: "Я дуже щаслива сьогодні ввечері.", wordType: "adjective", dataAiHint: "person happy", ...commonProps, _simulatedMastery: true },
       { wordBankId: "ua_v3", word: "Працювати", translations: { en: "To work"}, exampleSentence: "Мені подобається працювати в команді.", wordType: "verb", dataAiHint: "office work", ...commonProps },
       { wordBankId: "ua_v4", word: "Книга", translations: { en: "Book"}, exampleSentence: "Ця книга дуже цікава та інформативна.", wordType: "noun", dataAiHint: "interesting book", ...commonProps },
       { wordBankId: "ua_v5", word: "Місто", translations: { en: "City"}, exampleSentence: "Київ - велике і старовинне місто.", wordType: "noun", dataAiHint: "kyiv city", ...commonProps },
@@ -108,9 +105,8 @@ const getVocabularySessionWordsFallback = (languageCode: string, modeId: string,
     ];
   } else { // Default (English or generic)
     baseWords = [
-      { wordBankId: "en_v1", word: "Example", translations: { en: "Example (for non-English native)"}, exampleSentence: "This is a very good example for everyone.", wordType: "noun", dataAiHint: "example sign", ...commonProps },
-      // ... add more English words
-      { wordBankId: "en_v2", word: "Learn", translations: { en: "Learn (for non-English native)"}, exampleSentence: "I want to learn many new things.", wordType: "verb", dataAiHint: "student learning", ...commonProps },
+      { wordBankId: "en_v1", word: "Example", translations: { en: "Example (for non-English native)"}, exampleSentence: "This is a very good example for everyone.", wordType: "noun", dataAiHint: "example sign", ...commonProps, _simulatedMastery: true },
+      { wordBankId: "en_v2", word: "Learn", translations: { en: "Learn (for non-English native)"}, exampleSentence: "I want to learn many new things.", wordType: "verb", dataAiHint: "student learning", ...commonProps, _simulatedMastery: true },
       { wordBankId: "en_v3", word: "Quick", translations: { en: "Quick (for non-English native)"}, exampleSentence: "Be quick and efficient!", wordType: "adjective", dataAiHint: "running fast", ...commonProps },
       { wordBankId: "en_v4", word: "Vocabulary", translations: { en: "Vocabulary (for non-English native)"}, exampleSentence: "Expand your vocabulary daily.", wordType: "noun", dataAiHint: "dictionary words", ...commonProps },
       { wordBankId: "en_v5", word: "Practice", translations: { en: "Practice (for non-English native)"}, exampleSentence: "Consistent practice makes perfect.", wordType: "verb", dataAiHint: "person practicing", ...commonProps },
@@ -127,10 +123,10 @@ const getVocabularySessionWordsFallback = (languageCode: string, modeId: string,
     ];
   }
 
-  // Simplified translation logic for placeholder: uses English if direct match not found
+  const nativeLangCodeShort = nativeLanguageName.toLowerCase().substring(0,2);
   const processedWords = baseWords.map(bw => ({
     ...bw,
-    translation: bw.translations[nativeLanguageName.toLowerCase().substring(0,2)] || bw.translations['en'] || "Translation not found"
+    translation: bw.translations[nativeLangCodeShort] || bw.translations['en'] || "Translation not found"
   }));
   
   if (modeId === 'travel') {
@@ -163,70 +159,71 @@ export default function VocabularyPage() {
 
 
   const loadNewSessionWords = useCallback(async () => {
-    if (!isLoadingPreferences && selectedLanguage && selectedMode && nativeLanguage) {
-      setIsLoadingSession(true);
-      setShowBack(false);
+    if (isLoadingPreferences || !selectedLanguage || !selectedMode || !nativeLanguage) {
+      console.log("Skipping loadNewSessionWords because preferences are loading or not set.");
+      setIsLoadingSession(false); // Ensure loading state is cleared if we skip
+      return;
+    }
+    setIsLoadingSession(true);
+    setShowBack(false);
+    setMasteredWordIds(new Set()); // Reset session mastery on new load
 
-      const userId = authUser?.uid; 
+    try {
+      const input: GenerateVocabularyInput = {
+        languageName: selectedLanguage.name,
+        languageCode: selectedLanguage.code,
+        modeName: selectedMode.name, 
+        nativeLanguageName: nativeLanguage.name,
+        count: 15, // Fetch a larger pool from AI
+      };
+      
+      const result: GenerateVocabularyResult = await generateVocabulary(input);
 
-      try {
-        const input: GenerateVocabularyInput = {
-          languageName: selectedLanguage.name,
-          languageCode: selectedLanguage.code,
-          modeName: selectedMode.name, 
-          nativeLanguageName: nativeLanguage.name,
-          count: 15, // Fetch a larger pool from AI
-        };
-        
-        const result: GenerateVocabularyResult = await generateVocabulary(input);
-
-        if (!result || !result.vocabulary || result.vocabulary.length === 0) {
-          console.warn("AI flow did not return any vocabulary or returned empty. Using fallback.");
-          toast({title: "AI Vocabulary Failed", description: "Using placeholder words for this session.", variant: "default"});
-          const placeholderWords = getVocabularySessionWordsFallback(selectedLanguage.code, selectedMode.id, nativeLanguage.name);
-          setSessionWords(shuffleArray(placeholderWords).slice(0, WORDS_PER_SESSION));
-          setTotalWordsInCurrentPool(placeholderWords.length);
-          setMasteredWordIds(new Set());
-          setCurrentCardIndex(0);
-          setIsLoadingSession(false);
-          return;
-        }
-
-        const generatedWordItems: DailyWordItem[] = result.vocabulary.map(v => ({
-          wordBankId: v.wordBankId,
-          word: v.word,
-          translation: v.translation, 
-          exampleSentence: v.exampleSentence,
-          wordType: v.wordType,
-          dataAiHint: v.dataAiHint,
-          imageUrl: "https://placehold.co/600x400.png", // Placeholder, adjust as needed
-          audioUrl: "#", 
-        }));
-        
-        const shuffledPool = shuffleArray(generatedWordItems);
-        setSessionWords(shuffledPool.slice(0, WORDS_PER_SESSION));
-        setTotalWordsInCurrentPool(shuffledPool.length); 
-        setMasteredWordIds(new Set()); 
-        setCurrentCardIndex(0);
-
-      } catch (error: any) {
-        console.error("Error loading vocabulary session:", error);
-        toast({title: "Session Load Error", description: `Failed to load vocabulary: ${error.message || 'Unknown error'}. Using placeholder words.`, variant: "destructive"});
+      if (!result || !result.vocabulary || result.vocabulary.length === 0) {
+        console.warn("AI flow did not return any vocabulary or returned empty. Using fallback.");
+        toast({title: "AI Vocabulary Unavailable", description: "Using placeholder words for this session.", variant: "default"});
         const placeholderWords = getVocabularySessionWordsFallback(selectedLanguage.code, selectedMode.id, nativeLanguage.name);
         setSessionWords(shuffleArray(placeholderWords).slice(0, WORDS_PER_SESSION));
         setTotalWordsInCurrentPool(placeholderWords.length);
-        setMasteredWordIds(new Set());
         setCurrentCardIndex(0);
-      } finally {
         setIsLoadingSession(false);
+        return;
       }
+
+      const generatedWordItems: DailyWordItem[] = result.vocabulary.map(v => ({
+        wordBankId: v.wordBankId,
+        word: v.word,
+        translation: v.translation, 
+        exampleSentence: v.exampleSentence,
+        wordType: v.wordType,
+        dataAiHint: v.dataAiHint,
+        imageUrl: "https://placehold.co/600x400.png", // Placeholder, adjust as needed
+        audioUrl: "#", 
+      }));
+      
+      const shuffledPool = shuffleArray(generatedWordItems);
+      setSessionWords(shuffledPool.slice(0, WORDS_PER_SESSION));
+      setTotalWordsInCurrentPool(shuffledPool.length); 
+      setCurrentCardIndex(0);
+
+    } catch (error: any) {
+      console.error("Error loading vocabulary session:", error);
+      toast({title: "Session Load Error", description: `Failed to load vocabulary: ${error.message || 'Unknown error'}. Using placeholder words.`, variant: "destructive"});
+      const placeholderWords = getVocabularySessionWordsFallback(selectedLanguage.code, selectedMode.id, nativeLanguage.name);
+      setSessionWords(shuffleArray(placeholderWords).slice(0, WORDS_PER_SESSION));
+      setTotalWordsInCurrentPool(placeholderWords.length);
+      setCurrentCardIndex(0);
+    } finally {
+      setIsLoadingSession(false);
     }
   }, [selectedLanguage, selectedMode, nativeLanguage, isLoadingPreferences, authUser?.uid, toast]);
 
 
   useEffect(() => {
-    loadNewSessionWords();
-  }, [loadNewSessionWords]);
+    if (!isLoadingPreferences) { // Only load if preferences are ready
+        loadNewSessionWords();
+    }
+  }, [loadNewSessionWords, isLoadingPreferences]); // Add isLoadingPreferences here
 
   const handleCardClick = () => {
     if (sessionWords.length > 0) {
@@ -244,19 +241,21 @@ export default function VocabularyPage() {
       
     const nextIndex = currentCardIndex + 1;
     if (nextIndex >= sessionWords.length) {
+      // For now, just loop back to the start of the current session or show a message.
+      // A more advanced version would fetch new words or go to a summary.
+      toast({ title: "Session Complete!", description: "You've reviewed all words in this session. Reloading a new set." });
       loadNewSessionWords(); 
     } else {
       setCurrentCardIndex(nextIndex);
     }
     setShowBack(false); 
     
-    // Placeholder for SRS update logic
-    if (srsRating && currentWord) {
-      console.log(`Word "${currentWord.word}" (ID: ${currentWord.wordBankId}) rated as: ${srsRating}.`);
-      // Here you would typically call a function to update UserWordProgress in Firestore
-      // updateUserWordProgress(authUser?.uid, currentWord.wordBankId, srsRating);
+    // Placeholder for actual SRS update logic to a backend
+    if (srsRating && currentWord && authUser?.uid) {
+      console.log(`Word "${currentWord.word}" (ID: ${currentWord.wordBankId}) rated as: ${srsRating} by user ${authUser.uid}.`);
+      // Example: await updateUserWordProgressInFirestore(authUser.uid, currentWord.wordBankId, srsRating);
     }
-  }, [sessionWords, currentCardIndex, loadNewSessionWords, authUser?.uid]);
+  }, [sessionWords, currentCardIndex, loadNewSessionWords, authUser?.uid, toast]);
 
   const currentWord = sessionWords[currentCardIndex];
 
@@ -360,7 +359,7 @@ export default function VocabularyPage() {
               subText = sessionWords.length > 0 ? `Currently reviewing ${Math.min(currentCardIndex + 1, sessionWords.length)} / ${sessionWords.length}` : "No session active";
             } else if (stat.label === "New Words Potential") {
               displayValue = Math.max(0, totalWordsInCurrentPool - sessionWords.length);
-              subText = "From current language pool";
+              subText = "From current learning pool";
             } else if (stat.label === "Words Mastered (Session)") {
               displayValue = masteredWordIds.size; 
               subText = "Words marked 'Easy' in this session";
@@ -421,3 +420,4 @@ export default function VocabularyPage() {
     </AuthenticatedLayout>
   );
 }
+
