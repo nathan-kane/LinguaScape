@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useState, useRef, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast"; // Added import for useToast
 
 // Placeholder data
 const listeningExercises = [
@@ -46,11 +47,13 @@ export default function ListeningPage() {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const { toast } = useToast(); // Initialized useToast
 
   useEffect(() => {
     const audioElement = audioRef.current;
     if (audioElement) {
       const handleAudioEnd = () => {
+        console.log("Audio ended.");
         setIsPlaying(false);
       };
       audioElement.addEventListener('ended', handleAudioEnd);
@@ -61,34 +64,74 @@ export default function ListeningPage() {
         }
       };
     }
-  }, [currentExercise.audioUrl]); 
-
+  }, [currentExercise.audioUrl]); // Re-bind if audio element might change due to key change
 
   const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
+    const audioElement = audioRef.current;
+    if (!audioElement) {
+      console.error("Audio element is not available.");
+      toast({
+        title: "Audio Error",
+        description: "Audio player element not found. Cannot play audio.",
+        variant: "destructive",
+      });
+      setIsPlaying(false); // Ensure state consistency
+      return;
+    }
+
+    if (isPlaying) {
+      audioElement.pause();
+      setIsPlaying(false);
+      console.log("Audio paused.");
+    } else {
+      console.log("Attempting to play audio:", audioElement.src);
+      audioElement.currentTime = 0; // Ensure playback from the start
+      const playPromise = audioElement.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
             setIsPlaying(true);
-          }).catch(error => {
-            console.warn("Audio playback error (this is expected for placeholder audio files):", error);
-            alert("Audio playback is simulated as the placeholder audio file might not be available. In a real app, ensure valid audio files are present at paths like " + currentExercise.audioUrl);
-            setIsPlaying(false); 
+            console.log("Audio playback started.");
+          })
+          .catch((error) => {
+            console.error("Audio playback error:", error);
+            let description = "Could not play audio. Please ensure the audio file exists at: " + currentExercise.audioUrl;
+            if (error.name === 'NotAllowedError') {
+                 description = "Audio playback was not allowed by the browser. Please ensure you've interacted with the page.";
+            } else if (error.name === 'NotSupportedError') {
+                 description = "The audio format might not be supported or the audio source is invalid/missing: " + currentExercise.audioUrl;
+            } else if (error.message) {
+                description = `Could not play audio: ${error.message}. Path: ${currentExercise.audioUrl}`;
+            }
+            toast({
+              title: "Audio Playback Failed",
+              description: description,
+              variant: "destructive",
+            });
+            setIsPlaying(false);
           });
-        } else {
-           // This branch should ideally not be hit with modern .play() API
-           console.error("audioRef.current.play() did not return a Promise.");
-           alert("Audio playback is simulated (play() did not return a promise). Ensure valid audio files in a real app.");
-           setIsPlaying(false);
+      } else {
+        // This case is highly unlikely with modern browsers.
+        console.warn("audioRef.current.play() did not return a Promise.");
+        toast({
+          title: "Audio Warning",
+          description: "Audio playback might be unreliable (play() did not return a promise).",
+          variant: "default",
+        });
+        try {
+            audioElement.play(); // Attempt synchronous play
+            setIsPlaying(true); // Optimistic update
+        } catch (e: any) {
+            console.error("Fallback play attempt failed:", e);
+            toast({
+              title: "Audio Playback Failed",
+              description: `Fallback audio play attempt failed: ${e.message}`,
+              variant: "destructive",
+            });
+            setIsPlaying(false);
         }
       }
-    } else {
-        console.error("audioRef.current is null or undefined. Cannot play audio.");
-        alert("Audio element not available. Cannot play audio.");
     }
   };
 
@@ -118,6 +161,7 @@ export default function ListeningPage() {
   useEffect(() => {
     if (audioRef.current) {
         audioRef.current.load(); 
+        console.log("Audio loaded for new exercise:", currentExercise.audioUrl);
     }
   }, [currentExercise.audioUrl]);
 
@@ -151,6 +195,8 @@ export default function ListeningPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-center p-6 bg-secondary rounded-lg">
+              {/* Key change: Adding key={currentExercise.audioUrl} ensures React re-creates the audio element 
+                  when the src changes, which helps with reliable ref updates and event listeners. */}
               <audio ref={audioRef} src={currentExercise.audioUrl} key={currentExercise.audioUrl} hidden />
               <Button onClick={togglePlay} size="lg" className="text-lg px-8 py-6 bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isPlaying ? <PauseCircle className="mr-2 h-6 w-6" /> : <PlayCircle className="mr-2 h-6 w-6" />}
@@ -221,3 +267,4 @@ export default function ListeningPage() {
     </AuthenticatedLayout>
   );
 }
+
