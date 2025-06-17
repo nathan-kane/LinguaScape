@@ -2,19 +2,22 @@
 "use client";
 
 import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
-// Assuming you have a Genkit client initialized and imported somewhere that provides Firestore access
-import { getFirestore, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
-// import { genkitClient } from "@/lib/genkitClient"; // Example import
 import { Button } from "@/components/ui/button";
 import { Zap, BookOpen, PlusCircle, ListChecks, HelpCircle, ChevronRight, RefreshCw } from "lucide-react";
 import Link from "next/link";
-// import Image from "next/image"; // Not used in current component structure
 import { useState, useEffect, useCallback } from "react"; 
 import { useLearning } from "@/context/LearningContext";
-import type { DailyWordItem, UserWordProgress } from '@/lib/types';
-import type { SessionWordItem } from '@/lib/types';
+import type { DailyWordItem, UserWordProgress, SessionWordItem } from '@/lib/types'; // Ensure SessionWordItem is used or defined if different from DailyWordItem + progress
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  generateVocabulary,
+  type GenerateVocabularyInput,
+  // type GenerateVocabularyOutput, // This was for the LLM direct output
+  type GenerateVocabularyResult, // This is the final output of our wrapper
+} from '@/ai/flows/generate-vocabulary-flow';
+import { useToast } from "@/hooks/use-toast";
 
-// Updated FlashcardPlaceholder component
+
 const FlashcardPlaceholder = ({ front, back, example, showBack }: { front: string, back: string, example?: string, showBack: boolean }) => (
   <div className="relative w-full max-w-6xl mx-auto h-[250px] sm:h-[300px] rounded-xl shadow-xl perspective group cursor-pointer">
     <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
@@ -41,87 +44,97 @@ function shuffleArray<T>(array: T[]): T[] {
   return newArray;
 }
 
-// Removed _simulatedMastery from here as it's no longer used for the card
-const getVocabularySessionWords = (languageCode: string, modeId: string): DailyWordItem[] => {
+// Fallback placeholder data generator
+const getVocabularySessionWordsFallback = (languageCode: string, modeId: string, nativeLanguageName: string): DailyWordItem[] => {
   const commonProps = { imageUrl: "https://placehold.co/200x150.png", audioUrl: "#" };
-  let baseWords: DailyWordItem[] = [];
-
+  let baseWords: Omit<DailyWordItem, 'translation'> & { translations: Record<string, string> }[] = [];
+  // Using English as the key for translations for simplicity in placeholder
   if (languageCode === 'es') {
     baseWords = [
-      { wordBankId: "es_v1", word: "Amigo/Amiga", translation: "Friend", ...commonProps, exampleSentence: "Ella es mi amiga.", wordType: "noun", dataAiHint: "friends talking" },
-      { wordBankId: "es_v2", word: "Feliz", translation: "Happy", ...commonProps, exampleSentence: "Estoy feliz hoy.", wordType: "adjective", dataAiHint: "smiling face" },
-      { wordBankId: "es_v3", word: "Trabajar", translation: "To work", ...commonProps, exampleSentence: "Necesito trabajar mañana.", wordType: "verb", dataAiHint: "person working" },
-      { wordBankId: "es_v4", word: "Libro", translation: "Book", ...commonProps, exampleSentence: "Leo un libro interesante.", wordType: "noun", dataAiHint: "open book" },
-      { wordBankId: "es_v5", word: "Ciudad", translation: "City", ...commonProps, exampleSentence: "Me gusta esta ciudad grande y hermosa.", wordType: "noun", dataAiHint: "city skyline" },
-      { wordBankId: "es_v6", word: "Comida", translation: "Food", ...commonProps, exampleSentence: "La comida está deliciosa.", wordType: "noun", dataAiHint: "delicious food" },
-      { wordBankId: "es_v7", word: "Viajar", translation: "To travel", ...commonProps, exampleSentence: "Me encanta viajar por el mundo.", wordType: "verb", dataAiHint: "travel globe" },
-      { wordBankId: "es_v8", word: "Agua", translation: "Water", ...commonProps, exampleSentence: "Quisiera un vaso de agua fresca.", wordType: "noun", dataAiHint: "glass water" },
-      { wordBankId: "es_v9", word: "Rojo", translation: "Red", ...commonProps, exampleSentence: "El coche es de un color rojo brillante.", wordType: "adjective", dataAiHint: "red color" },
-      { wordBankId: "es_v10", word: "Gracias", translation: "Thank you", ...commonProps, exampleSentence: "Muchas gracias por su amable ayuda.", wordType: "phrase", dataAiHint: "thank you gesture" },
-      { wordBankId: "es_v11", word: "Escuela", translation: "School", ...commonProps, exampleSentence: "Los niños van a la escuela primaria.", wordType: "noun", dataAiHint: "school building" },
-      { wordBankId: "es_v12", word: "Música", translation: "Music", ...commonProps, exampleSentence: "Escucho música clásica todos los días.", wordType: "noun", dataAiHint: "music notes" },
-      { wordBankId: "es_v13", word: "Casa", translation: "House", ...commonProps, exampleSentence: "Mi casa tiene un jardín bonito.", wordType: "noun", dataAiHint: "house garden" },
-      { wordBankId: "es_v14", word: "Perro", translation: "Dog", ...commonProps, exampleSentence: "El perro ladra al cartero.", wordType: "noun", dataAiHint: "dog barking" },
-      { wordBankId: "es_v15", word: "Gato", translation: "Cat", ...commonProps, exampleSentence: "El gato duerme en el sofá.", wordType: "noun", dataAiHint: "cat sleeping" },
+      { wordBankId: "es_v1", word: "Amigo/Amiga", translations: { en: "Friend"}, exampleSentence: "Ella es mi amiga.", wordType: "noun", dataAiHint: "friends talking", ...commonProps },
+      { wordBankId: "es_v2", word: "Feliz", translations: { en: "Happy"}, exampleSentence: "Estoy feliz hoy.", wordType: "adjective", dataAiHint: "smiling face", ...commonProps },
+      { wordBankId: "es_v3", word: "Trabajar", translations: { en: "To work"}, exampleSentence: "Necesito trabajar mañana.", wordType: "verb", dataAiHint: "person working", ...commonProps },
+      // ... add more Spanish words up to 15
+      { wordBankId: "es_v4", word: "Libro", translations: { en: "Book" }, exampleSentence: "Leo un libro interesante.", wordType: "noun", dataAiHint: "open book", ...commonProps },
+      { wordBankId: "es_v5", word: "Ciudad", translations: { en: "City" }, exampleSentence: "Me gusta esta ciudad grande y hermosa.", wordType: "noun", dataAiHint: "city skyline", ...commonProps },
+      { wordBankId: "es_v6", word: "Comida", translations: { en: "Food" }, exampleSentence: "La comida está deliciosa.", wordType: "noun", dataAiHint: "delicious food", ...commonProps },
+      { wordBankId: "es_v7", word: "Viajar", translations: { en: "To travel" }, exampleSentence: "Me encanta viajar por el mundo.", wordType: "verb", dataAiHint: "travel globe", ...commonProps },
+      { wordBankId: "es_v8", word: "Agua", translations: { en: "Water" }, exampleSentence: "Quisiera un vaso de agua fresca.", wordType: "noun", dataAiHint: "glass water", ...commonProps },
+      { wordBankId: "es_v9", word: "Rojo", translations: { en: "Red" }, exampleSentence: "El coche es de un color rojo brillante.", wordType: "adjective", dataAiHint: "red color", ...commonProps },
+      { wordBankId: "es_v10", word: "Gracias", translations: { en: "Thank you" }, exampleSentence: "Muchas gracias por su amable ayuda.", wordType: "phrase", dataAiHint: "thank you gesture", ...commonProps },
+      { wordBankId: "es_v11", word: "Escuela", translations: { en: "School" }, exampleSentence: "Los niños van a la escuela primaria.", wordType: "noun", dataAiHint: "school building", ...commonProps },
+      { wordBankId: "es_v12", word: "Música", translations: { en: "Music" }, exampleSentence: "Escucho música clásica todos los días.", wordType: "noun", dataAiHint: "music notes", ...commonProps },
+      { wordBankId: "es_v13", word: "Casa", translations: { en: "House" }, exampleSentence: "Mi casa tiene un jardín bonito.", wordType: "noun", dataAiHint: "house garden", ...commonProps },
+      { wordBankId: "es_v14", word: "Perro", translations: { en: "Dog" }, exampleSentence: "El perro ladra al cartero.", wordType: "noun", dataAiHint: "dog barking", ...commonProps },
+      { wordBankId: "es_v15", word: "Gato", translations: { en: "Cat" }, exampleSentence: "El gato duerme en el sofá.", wordType: "noun", dataAiHint: "cat sleeping", ...commonProps },
     ];
   } else if (languageCode === 'fr') {
     baseWords = [
-      { wordBankId: "fr_v1", word: "Ami/Amie", translation: "Friend", ...commonProps, exampleSentence: "Il est mon meilleur ami.", wordType: "noun", dataAiHint: "friends together" },
-      { wordBankId: "fr_v2", word: "Content/Contente", translation: "Happy", ...commonProps, exampleSentence: "Je suis très content de te voir.", wordType: "adjective", dataAiHint: "joyful expression" },
-      { wordBankId: "fr_v3", word: "Travailler", translation: "To work", ...commonProps, exampleSentence: "Je dois travailler dur pour réussir.", wordType: "verb", dataAiHint: "desk work" },
-      { wordBankId: "fr_v4", word: "Livre", translation: "Book", ...commonProps, exampleSentence: "C'est un livre passionnant à lire.", wordType: "noun", dataAiHint: "stack books" },
-      { wordBankId: "fr_v5", word: "Ville", translation: "City", ...commonProps, exampleSentence: "Paris est une ville magnifique.", wordType: "noun", dataAiHint: "paris city" },
-      { wordBankId: "fr_v6", word: "Nourriture", translation: "Food", ...commonProps, exampleSentence: "J'aime la nourriture française authentique.", wordType: "noun", dataAiHint: "french food" },
-      { wordBankId: "fr_v7", word: "Voyager", translation: "To travel", ...commonProps, exampleSentence: "Elle aime voyager et découvrir le monde.", wordType: "verb", dataAiHint: "suitcase travel" },
-      { wordBankId: "fr_v8", word: "Eau", translation: "Water", ...commonProps, exampleSentence: "Un verre d'eau fraîche, s'il vous plaît.", wordType: "noun", dataAiHint: "bottle water" },
-      { wordBankId: "fr_v9", word: "Rouge", translation: "Red", ...commonProps, exampleSentence: "La pomme est d'un beau rouge vif.", wordType: "adjective", dataAiHint: "red apple" },
-      { wordBankId: "fr_v10", word: "Merci", translation: "Thank you", ...commonProps, exampleSentence: "Merci beaucoup pour votre gentillesse.", wordType: "phrase", dataAiHint: "merci card" },
-      { wordBankId: "fr_v11", word: "École", translation: "School", ...commonProps, exampleSentence: "Les enfants sont à l'école maternelle.", wordType: "noun", dataAiHint: "school children" },
-      { wordBankId: "fr_v12", word: "Musique", translation: "Music", ...commonProps, exampleSentence: "J'adore la musique classique et le jazz.", wordType: "noun", dataAiHint: "classical music" },
-      { wordBankId: "fr_v13", word: "Maison", translation: "House", ...commonProps, exampleSentence: "J'habite dans une petite maison.", wordType: "noun", dataAiHint: "small house" },
-      { wordBankId: "fr_v14", word: "Chien", translation: "Dog", ...commonProps, exampleSentence: "Mon chien aime jouer dans le parc.", wordType: "noun", dataAiHint: "dog park" },
-      { wordBankId: "fr_v15", word: "Chat", translation: "Cat", ...commonProps, exampleSentence: "Le chat noir traverse la rue.", wordType: "noun", dataAiHint: "black cat" },
+      { wordBankId: "fr_v1", word: "Ami/Amie", translations: { en: "Friend"}, exampleSentence: "Il est mon meilleur ami.", wordType: "noun", dataAiHint: "friends together", ...commonProps },
+      { wordBankId: "fr_v2", word: "Content/Contente", translations: { en: "Happy"}, exampleSentence: "Je suis très content de te voir.", wordType: "adjective", dataAiHint: "joyful expression", ...commonProps },
+      // ... add more French words
+      { wordBankId: "fr_v3", word: "Travailler", translations: { en: "To work"}, exampleSentence: "Je dois travailler dur pour réussir.", wordType: "verb", dataAiHint: "desk work", ...commonProps },
+      { wordBankId: "fr_v4", word: "Livre", translations: { en: "Book"}, exampleSentence: "C'est un livre passionnant à lire.", wordType: "noun", dataAiHint: "stack books", ...commonProps },
+      { wordBankId: "fr_v5", word: "Ville", translations: { en: "City"}, exampleSentence: "Paris est une ville magnifique.", wordType: "noun", dataAiHint: "paris city", ...commonProps },
+      { wordBankId: "fr_v6", word: "Nourriture", translations: { en: "Food"}, exampleSentence: "J'aime la nourriture française authentique.", wordType: "noun", dataAiHint: "french food", ...commonProps },
+      { wordBankId: "fr_v7", word: "Voyager", translations: { en: "To travel"}, exampleSentence: "Elle aime voyager et découvrir le monde.", wordType: "verb", dataAiHint: "suitcase travel", ...commonProps },
+      { wordBankId: "fr_v8", word: "Eau", translations: { en: "Water"}, exampleSentence: "Un verre d'eau fraîche, s'il vous plaît.", wordType: "noun", dataAiHint: "bottle water", ...commonProps },
+      { wordBankId: "fr_v9", word: "Rouge", translations: { en: "Red"}, exampleSentence: "La pomme est d'un beau rouge vif.", wordType: "adjective", dataAiHint: "red apple", ...commonProps },
+      { wordBankId: "fr_v10", word: "Merci", translations: { en: "Thank you"}, exampleSentence: "Merci beaucoup pour votre gentillesse.", wordType: "phrase", dataAiHint: "merci card", ...commonProps },
+      { wordBankId: "fr_v11", word: "École", translations: { en: "School"}, exampleSentence: "Les enfants sont à l'école maternelle.", wordType: "noun", dataAiHint: "school children", ...commonProps },
+      { wordBankId: "fr_v12", word: "Musique", translations: { en: "Music"}, exampleSentence: "J'adore la musique classique et le jazz.", wordType: "noun", dataAiHint: "classical music", ...commonProps },
+      { wordBankId: "fr_v13", word: "Maison", translations: { en: "House"}, exampleSentence: "J'habite dans une petite maison.", wordType: "noun", dataAiHint: "small house", ...commonProps },
+      { wordBankId: "fr_v14", word: "Chien", translations: { en: "Dog"}, exampleSentence: "Mon chien aime jouer dans le parc.", wordType: "noun", dataAiHint: "dog park", ...commonProps },
+      { wordBankId: "fr_v15", word: "Chat", translations: { en: "Cat"}, exampleSentence: "Le chat noir traverse la rue.", wordType: "noun", dataAiHint: "black cat", ...commonProps },
     ];
   } else if (languageCode === 'ua') {
      baseWords = [
-      { wordBankId: "ua_v1", word: "Друг/Подруга", translation: "Friend", ...commonProps, exampleSentence: "Він мій найкращий і найнадійніший друг.", wordType: "noun", dataAiHint: "best friends" },
-      { wordBankId: "ua_v2", word: "Щасливий/Щаслива", translation: "Happy", ...commonProps, exampleSentence: "Я дуже щаслива сьогодні ввечері.", wordType: "adjective", dataAiHint: "person happy" },
-      { wordBankId: "ua_v3", word: "Працювати", translation: "To work", ...commonProps, exampleSentence: "Мені подобається працювати в команді.", wordType: "verb", dataAiHint: "office work" },
-      { wordBankId: "ua_v4", word: "Книга", translation: "Book", ...commonProps, exampleSentence: "Ця книга дуже цікава та інформативна.", wordType: "noun", dataAiHint: "interesting book" },
-      { wordBankId: "ua_v5", word: "Місто", translation: "City", ...commonProps, exampleSentence: "Київ - велике і старовинне місто.", wordType: "noun", dataAiHint: "kyiv city" },
-      { wordBankId: "ua_v6", word: "Їжа", translation: "Food", ...commonProps, exampleSentence: "Українська їжа дуже смачна і ситна.", wordType: "noun", dataAiHint: "ukrainian food" },
-      { wordBankId: "ua_v7", word: "Подорожувати", translation: "To travel", ...commonProps, exampleSentence: "Ми любимо подорожувати всією родиною.", wordType: "verb", dataAiHint: "map travel" },
-      { wordBankId: "ua_v8", word: "Вода", translation: "Water", ...commonProps, exampleSentence: "Дайте мені пляшку чистої води, будь ласка.", wordType: "noun", dataAiHint: "water drop" },
-      { wordBankId: "ua_v9", word: "Червоний", translation: "Red", ...commonProps, exampleSentence: "Прапор України червоний і чорний.", wordType: "adjective", dataAiHint: "red black" },
-      { wordBankId: "ua_v10", word: "Дякую", translation: "Thank you", ...commonProps, exampleSentence: "Щиро дякую за вашу допомогу.", wordType: "phrase", dataAiHint: "thank you hands" },
-      { wordBankId: "ua_v11", word: "Школа", translation: "School", ...commonProps, exampleSentence: "Моя школа велика і сучасна.", wordType: "noun", dataAiHint: "school facade" },
-      { wordBankId: "ua_v12", word: "Музика", translation: "Music", ...commonProps, exampleSentence: "Яка твоя улюблена українська музика?", wordType: "noun", dataAiHint: "headphones music" },
-      { wordBankId: "ua_v13", word: "Дім", translation: "House/Home", ...commonProps, exampleSentence: "Мій дім - моя фортеця.", wordType: "noun", dataAiHint: "cozy home" },
-      { wordBankId: "ua_v14", word: "Собака", translation: "Dog", ...commonProps, exampleSentence: "Собака - вірний друг людини.", wordType: "noun", dataAiHint: "loyal dog" },
-      { wordBankId: "ua_v15", word: "Кіт", translation: "Cat", ...commonProps, exampleSentence: "Мій кіт любить спати на сонці.", wordType: "noun", dataAiHint: "cat sunbathing" },
+      { wordBankId: "ua_v1", word: "Друг/Подруга", translations: { en: "Friend"}, exampleSentence: "Він мій найкращий і найнадійніший друг.", wordType: "noun", dataAiHint: "best friends", ...commonProps },
+      // ... add more Ukrainian words
+      { wordBankId: "ua_v2", word: "Щасливий/Щаслива", translations: { en: "Happy"}, exampleSentence: "Я дуже щаслива сьогодні ввечері.", wordType: "adjective", dataAiHint: "person happy", ...commonProps },
+      { wordBankId: "ua_v3", word: "Працювати", translations: { en: "To work"}, exampleSentence: "Мені подобається працювати в команді.", wordType: "verb", dataAiHint: "office work", ...commonProps },
+      { wordBankId: "ua_v4", word: "Книга", translations: { en: "Book"}, exampleSentence: "Ця книга дуже цікава та інформативна.", wordType: "noun", dataAiHint: "interesting book", ...commonProps },
+      { wordBankId: "ua_v5", word: "Місто", translations: { en: "City"}, exampleSentence: "Київ - велике і старовинне місто.", wordType: "noun", dataAiHint: "kyiv city", ...commonProps },
+      { wordBankId: "ua_v6", word: "Їжа", translations: { en: "Food"}, exampleSentence: "Українська їжа дуже смачна і ситна.", wordType: "noun", dataAiHint: "ukrainian food", ...commonProps },
+      { wordBankId: "ua_v7", word: "Подорожувати", translations: { en: "To travel"}, exampleSentence: "Ми любимо подорожувати всією родиною.", wordType: "verb", dataAiHint: "map travel", ...commonProps },
+      { wordBankId: "ua_v8", word: "Вода", translations: { en: "Water"}, exampleSentence: "Дайте мені пляшку чистої води, будь ласка.", wordType: "noun", dataAiHint: "water drop", ...commonProps },
+      { wordBankId: "ua_v9", word: "Червоний", translations: { en: "Red"}, exampleSentence: "Прапор України червоний і чорний.", wordType: "adjective", dataAiHint: "red black", ...commonProps },
+      { wordBankId: "ua_v10", word: "Дякую", translations: { en: "Thank you"}, exampleSentence: "Щиро дякую за вашу допомогу.", wordType: "phrase", dataAiHint: "thank you hands", ...commonProps },
+      { wordBankId: "ua_v11", word: "Школа", translations: { en: "School"}, exampleSentence: "Моя школа велика і сучасна.", wordType: "noun", dataAiHint: "school facade", ...commonProps },
+      { wordBankId: "ua_v12", word: "Музика", translations: { en: "Music"}, exampleSentence: "Яка твоя улюблена українська музика?", wordType: "noun", dataAiHint: "headphones music", ...commonProps },
+      { wordBankId: "ua_v13", word: "Дім", translations: { en: "House/Home"}, exampleSentence: "Мій дім - моя фортеця.", wordType: "noun", dataAiHint: "cozy home", ...commonProps },
+      { wordBankId: "ua_v14", word: "Собака", translations: { en: "Dog"}, exampleSentence: "Собака - вірний друг людини.", wordType: "noun", dataAiHint: "loyal dog", ...commonProps },
+      { wordBankId: "ua_v15", word: "Кіт", translations: { en: "Cat"}, exampleSentence: "Мій кіт любить спати на сонці.", wordType: "noun", dataAiHint: "cat sunbathing", ...commonProps },
     ];
   } else { // Default (English or generic)
     baseWords = [
-      { wordBankId: "en_v1", word: "Example", translation: "Ejemplo (Spanish)", ...commonProps, exampleSentence: "This is a very good example for everyone.", wordType: "noun", dataAiHint: "example sign" },
-      { wordBankId: "en_v2", word: "Learn", translation: "Aprender (Spanish)", ...commonProps, exampleSentence: "I want to learn many new things.", wordType: "verb", dataAiHint: "student learning" },
-      { wordBankId: "en_v3", word: "Quick", translation: "Rápido (Spanish)", ...commonProps, exampleSentence: "Be quick and efficient!", wordType: "adjective", dataAiHint: "running fast" },
-      { wordBankId: "en_v4", word: "Vocabulary", translation: "Vocabulario (Spanish)", ...commonProps, exampleSentence: "Expand your vocabulary daily.", wordType: "noun", dataAiHint: "dictionary words" },
-      { wordBankId: "en_v5", word: "Practice", translation: "Práctica (Spanish)", ...commonProps, exampleSentence: "Consistent practice makes perfect.", wordType: "verb", dataAiHint: "person practicing" },
-      { wordBankId: "en_v6", word: "Hello", translation: "Hola (Spanish)", ...commonProps, exampleSentence: "Hello, how are you doing today?", wordType: "phrase", dataAiHint: "greeting wave" },
-      { wordBankId: "en_v7", word: "Goodbye", translation: "Adiós (Spanish)", ...commonProps, exampleSentence: "It's time to say goodbye to them.", wordType: "phrase", dataAiHint: "waving goodbye" },
-      { wordBankId: "en_v8", word: "House", translation: "Casa (Spanish)", ...commonProps, exampleSentence: "This is my beautiful house.", wordType: "noun", dataAiHint: "house illustration" },
-      { wordBankId: "en_v9", word: "Cat", translation: "Gato (Spanish)", ...commonProps, exampleSentence: "The fluffy cat is sleeping soundly.", wordType: "noun", dataAiHint: "sleeping cat" },
-      { wordBankId: "en_v10", word: "Dog", translation: "Perro (Spanish)", ...commonProps, exampleSentence: "The playful dog wags its tail.", wordType: "noun", dataAiHint: "playful dog" },
-      { wordBankId: "en_v11", word: "Blue", translation: "Azul (Spanish)", ...commonProps, exampleSentence: "The deep blue sky is clear.", wordType: "adjective", dataAiHint: "blue sky" },
-      { wordBankId: "en_v12", word: "Big", translation: "Grande (Spanish)", ...commonProps, exampleSentence: "It's a very big and gray elephant.", wordType: "adjective", dataAiHint: "big elephant" },
-      { wordBankId: "en_v13", word: "Small", translation: "Pequeño (Spanish)", ...commonProps, exampleSentence: "This is a small but cozy room.", wordType: "adjective", dataAiHint: "small room" },
-      { wordBankId: "en_v14", word: "Computer", translation: "Computadora (Spanish)", ...commonProps, exampleSentence: "My computer is very fast.", wordType: "noun", dataAiHint: "modern computer" },
-      { wordBankId: "en_v15", word: "Coffee", translation: "Café (Spanish)", ...commonProps, exampleSentence: "I need a hot coffee in the morning.", wordType: "noun", dataAiHint: "coffee cup" },
+      { wordBankId: "en_v1", word: "Example", translations: { en: "Example (for non-English native)"}, exampleSentence: "This is a very good example for everyone.", wordType: "noun", dataAiHint: "example sign", ...commonProps },
+      // ... add more English words
+      { wordBankId: "en_v2", word: "Learn", translations: { en: "Learn (for non-English native)"}, exampleSentence: "I want to learn many new things.", wordType: "verb", dataAiHint: "student learning", ...commonProps },
+      { wordBankId: "en_v3", word: "Quick", translations: { en: "Quick (for non-English native)"}, exampleSentence: "Be quick and efficient!", wordType: "adjective", dataAiHint: "running fast", ...commonProps },
+      { wordBankId: "en_v4", word: "Vocabulary", translations: { en: "Vocabulary (for non-English native)"}, exampleSentence: "Expand your vocabulary daily.", wordType: "noun", dataAiHint: "dictionary words", ...commonProps },
+      { wordBankId: "en_v5", word: "Practice", translations: { en: "Practice (for non-English native)"}, exampleSentence: "Consistent practice makes perfect.", wordType: "verb", dataAiHint: "person practicing", ...commonProps },
+      { wordBankId: "en_v6", word: "Hello", translations: { en: "Hello (for non-English native)"}, exampleSentence: "Hello, how are you doing today?", wordType: "phrase", dataAiHint: "greeting wave", ...commonProps },
+      { wordBankId: "en_v7", word: "Goodbye", translations: { en: "Goodbye (for non-English native)"}, exampleSentence: "It's time to say goodbye to them.", wordType: "phrase", dataAiHint: "waving goodbye", ...commonProps },
+      { wordBankId: "en_v8", word: "House", translations: { en: "House (for non-English native)"}, exampleSentence: "This is my beautiful house.", wordType: "noun", dataAiHint: "house illustration", ...commonProps },
+      { wordBankId: "en_v9", word: "Cat", translations: { en: "Cat (for non-English native)"}, exampleSentence: "The fluffy cat is sleeping soundly.", wordType: "noun", dataAiHint: "sleeping cat", ...commonProps },
+      { wordBankId: "en_v10", word: "Dog", translations: { en: "Dog (for non-English native)"}, exampleSentence: "The playful dog wags its tail.", wordType: "noun", dataAiHint: "playful dog", ...commonProps },
+      { wordBankId: "en_v11", word: "Blue", translations: { en: "Blue (for non-English native)"}, exampleSentence: "The deep blue sky is clear.", wordType: "adjective", dataAiHint: "blue sky", ...commonProps },
+      { wordBankId: "en_v12", word: "Big", translations: { en: "Big (for non-English native)"}, exampleSentence: "It's a very big and gray elephant.", wordType: "adjective", dataAiHint: "big elephant", ...commonProps },
+      { wordBankId: "en_v13", word: "Small", translations: { en: "Small (for non-English native)"}, exampleSentence: "This is a small but cozy room.", wordType: "adjective", dataAiHint: "small room", ...commonProps },
+      { wordBankId: "en_v14", word: "Computer", translations: { en: "Computer (for non-English native)"}, exampleSentence: "My computer is very fast.", wordType: "noun", dataAiHint: "modern computer", ...commonProps },
+      { wordBankId: "en_v15", word: "Coffee", translations: { en: "Coffee (for non-English native)"}, exampleSentence: "I need a hot coffee in the morning.", wordType: "noun", dataAiHint: "coffee cup", ...commonProps },
     ];
   }
+
+  // Simplified translation logic for placeholder: uses English if direct match not found
+  const processedWords = baseWords.map(bw => ({
+    ...bw,
+    translation: bw.translations[nativeLanguageName.toLowerCase().substring(0,2)] || bw.translations['en'] || "Translation not found"
+  }));
   
   if (modeId === 'travel') {
-    return baseWords.map(word => {
+    return processedWords.map(word => {
         if (word.word === "Agua" && languageCode === 'es') return {...word, exampleSentence: "Necesito agua para el viaje largo.", dataAiHint: "travel water bottle"};
         if (word.word === "Eau" && languageCode === 'fr') return {...word, exampleSentence: "J'ai besoin d'eau pour le voyage en train.", dataAiHint: "travel water bottle"};
         if (word.word === "Вода" && languageCode === 'ua') return {...word, exampleSentence: "Мені потрібна вода для подорожі літаком.", dataAiHint: "travel water bottle"};
@@ -131,14 +144,16 @@ const getVocabularySessionWords = (languageCode: string, modeId: string): DailyW
         return word;
     });
   }
-  return baseWords;
+  return processedWords;
 };
+
 
 const WORDS_PER_SESSION = 7;
 
 export default function VocabularyPage() {
   const [showBack, setShowBack] = useState(false);
-  const { selectedLanguage, selectedMode, isLoadingPreferences } = useLearning();
+  const { selectedLanguage, selectedMode, nativeLanguage, isLoadingPreferences, authUser } = useLearning();
+  const { toast } = useToast();
   
   const [sessionWords, setSessionWords] = useState<DailyWordItem[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState<number>(0);
@@ -148,172 +163,66 @@ export default function VocabularyPage() {
 
 
   const loadNewSessionWords = useCallback(async () => {
-    if (!isLoadingPreferences && selectedLanguage && selectedMode) {
+    if (!isLoadingPreferences && selectedLanguage && selectedMode && nativeLanguage) {
       setIsLoadingSession(true);
-      
-      // Assume userId is available, e.g., from an authentication context
-      const userId = 'YOUR_USER_ID'; // **Replace with actual user ID**
+      setShowBack(false);
+
+      const userId = authUser?.uid; 
 
       try {
-        // 1. Call generateVocabularyFlow using the Genkit client
-        // You will need to replace `genkitClient.runFlow` with your actual method
-        const generatedVocabulary = await (window as any).genkitClient.runFlow('generateVocabularyFlow', { // Using window as a temporary placeholder for a global client
+        const input: GenerateVocabularyInput = {
+          languageName: selectedLanguage.name,
           languageCode: selectedLanguage.code,
+          modeName: selectedMode.name, 
+          nativeLanguageName: nativeLanguage.name,
+          count: 15, // Fetch a larger pool from AI
+        };
+        
+        const result: GenerateVocabularyResult = await generateVocabulary(input);
 
-          modeId: selectedMode.id,
-        });
-
-        if (!generatedVocabulary || generatedVocabulary.vocabulary.length === 0) {
-          console.warn("AI flow did not return any vocabulary.");
-           setSessionWords([]);
-           setTotalWordsInCurrentPool(0);
-           setMasteredWordIds(new Set());
-           setIsLoadingSession(false);
-           return;
+        if (!result || !result.vocabulary || result.vocabulary.length === 0) {
+          console.warn("AI flow did not return any vocabulary or returned empty. Using fallback.");
+          toast({title: "AI Vocabulary Failed", description: "Using placeholder words for this session.", variant: "default"});
+          const placeholderWords = getVocabularySessionWordsFallback(selectedLanguage.code, selectedMode.id, nativeLanguage.name);
+          setSessionWords(shuffleArray(placeholderWords).slice(0, WORDS_PER_SESSION));
+          setTotalWordsInCurrentPool(placeholderWords.length);
+          setMasteredWordIds(new Set());
+          setCurrentCardIndex(0);
+          setIsLoadingSession(false);
+          return;
         }
 
-        const generatedWordItems: DailyWordItem[] = generatedVocabulary.vocabulary;
-        const generatedWordIds = generatedWordItems.map(word => word.wordBankId);
-
-        // 3. Call getUserWordProgress to check for existing progress
-        // Placeholder for database interaction
-        // You will need to implement getUserWordProgress based on your database
-        const existingProgress = await getUserWordProgress(userId, generatedWordIds);
-
-        const existingProgressMap = new Map(existingProgress.map(p => [p.wordBankId, p]));
-        const wordsToSave: UserWordProgress[] = []; // For new progress entries to save
-        const sessionWordItems: SessionWordItem[] = []; // For words to display in the session
-
-        // 4 & 5. Process results and create new entries
-        // Explicitly type 'word' as DailyWordItem
-        for (const word of generatedWordItems) {
-          const existing = existingProgressMap.get(word.wordBankId);
-          if (existing) {
-            // Word has existing progress, combine AI data with existing progress for session display
-            const sessionItem: SessionWordItem = {
-               // Include all properties from DailyWordItem
-               ...word,
-
-               // Explicitly include relevant progress properties from existing UserWordProgress
-               status: existing.status,
-               fluency: existing.fluency,
-               lastReviewedAt: existing.lastReviewedAt,
-               nextReviewAt: existing.nextReviewAt,
-               currentIntervalDays: existing.currentIntervalDays,
-               easeFactor: existing.easeFactor,
-               repetitions: existing.repetitions,
-               lapses: existing.lapses,
-               totalTimesSeen: existing.totalTimesSeen,
-               totalCorrect: existing.totalCorrect,
-               totalIncorrect: existing.totalIncorrect,
-               firstLearnedAt: existing.firstLearnedAt,
-               // Assuming id, userId, languageCode are also needed for SessionWordItem from UserWordProgress
-               id: existing.id,
-               userId: existing.userId,
-               languageCode: existing.languageCode,
-            });
-            sessionWordItems.push(sessionItem);
-          } else {
-            // Word is new, create a new UserWordProgress entry
-            // id will be generated by Firestore if not explicitly set
-            const newUserProgress: UserWordProgress = {
-              // id will be generated by Firestore if not explicitly set
-              userId: userId,
-              wordBankId: word.wordBankId,
-              languageCode: selectedLanguage.code, // Include language code
-              status: 'new', // Initial status
-              fluency: 0, // Initial fluency
-              lastReviewedAt: Date.now(), // Initial review time
-              nextReviewAt: Date.now(), // Initial next review time
-              currentIntervalDays: 0, // Initial interval
-              easeFactor: 2.5, // Initial ease factor (standard Anki default)
-              repetitions: 0, // Initial repetitions
-              lapses: 0, // Initial lapses
-              totalTimesSeen: 0, // Initial total times seen
-              totalCorrect: 0, // Initial total correct
-              totalIncorrect: 0, // Initial total incorrect
-            };
-
-            wordsToSave.push(newUserProgress);
-
-             sessionWordItems.push({
-               ...word, // Include all properties from DailyWordItem
-
-               // Explicitly include relevant progress properties from newUserProgress
-                status: newUserProgress.status,
-               fluency: newUserProgress.fluency,
-               lastReviewedAt: newUserProgress.lastReviewedAt,
-               nextReviewAt: newUserProgress.nextReviewAt,
-               currentIntervalDays: newUserProgress.currentIntervalDays,
-               easeFactor: newUserProgress.easeFactor,
-               repetitions: newUserProgress.repetitions,
-               lapses: newUserProgress.lapses,
-                totalTimesSeen: newUserProgress.totalTimesSeen,
-               totalCorrect: newUserProgress.totalCorrect,
-               totalIncorrect: newUserProgress.totalIncorrect,
-               firstLearnedAt: newUserProgress.firstLearnedAt,
-               // Assuming id, userId, languageCode are also needed for SessionWordItem from UserWordProgress
-               id: newUserProgress.id, // Will be undefined initially, but will be populated after saving
-               userId: newUserProgress.userId,
-               languageCode: newUserProgress.languageCode,
-            });
-
-          }
-
-
-        }
-
-        // 6. Call saveUserWordProgress with new entries
-        // Placeholder for database interaction
-        // You will need to implement saveUserWordProgress based on your database
-        if (wordsToSave.length > 0) {
-          await saveUserWordProgress(wordsToSave);
-        }
-
-        // 7. Combine generated data with progress (already done in loop)
-        // 8. Update state
-        const shuffledSessionWords = shuffleArray(sessionWordItems);
-        setSessionWords(shuffledSessionWords.slice(0, WORDS_PER_SESSION)); // Take only the session subset
-
-        // Update total words based on the potentially expanded set from AI + existing
-        setTotalWordsInCurrentPool(sessionWordItems.length);
-        setMasteredWordIds(new Set()); // Reset session mastery count
-
+        const generatedWordItems: DailyWordItem[] = result.vocabulary.map(v => ({
+          wordBankId: v.wordBankId,
+          word: v.word,
+          translation: v.translation, 
+          exampleSentence: v.exampleSentence,
+          wordType: v.wordType,
+          dataAiHint: v.dataAiHint,
+          imageUrl: "https://placehold.co/600x400.png", // Placeholder, adjust as needed
+          audioUrl: "#", 
+        }));
+        
+        const shuffledPool = shuffleArray(generatedWordItems);
+        setSessionWords(shuffledPool.slice(0, WORDS_PER_SESSION));
+        setTotalWordsInCurrentPool(shuffledPool.length); 
+        setMasteredWordIds(new Set()); 
         setCurrentCardIndex(0);
-        setShowBack(false);
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading vocabulary session:", error);
-        // Handle error state, maybe show a message to the user
-         setSessionWords([]);
-         setTotalWordsInCurrentPool(0);
-         setMasteredWordIds(new Set());
+        toast({title: "Session Load Error", description: `Failed to load vocabulary: ${error.message || 'Unknown error'}. Using placeholder words.`, variant: "destructive"});
+        const placeholderWords = getVocabularySessionWordsFallback(selectedLanguage.code, selectedMode.id, nativeLanguage.name);
+        setSessionWords(shuffleArray(placeholderWords).slice(0, WORDS_PER_SESSION));
+        setTotalWordsInCurrentPool(placeholderWords.length);
+        setMasteredWordIds(new Set());
+        setCurrentCardIndex(0);
       } finally {
         setIsLoadingSession(false);
       }
     }
-  }, [selectedLanguage, selectedMode, isLoadingPreferences]);
+  }, [selectedLanguage, selectedMode, nativeLanguage, isLoadingPreferences, authUser?.uid, toast]);
 
- // Placeholder function - Replace with your actual database implementation
-  const getUserWordProgress = async (userId: string, wordIdentifiers: string[]): Promise<UserWordProgress[]> => {
-    console.log(`[DB Placeholder] Fetching progress for user ${userId} and words: ${wordIdentifiers.join(', ')}`);
-    // Implement your database query here
-    // Example: return db.collection('userWordProgress').where('userId', '==', userId).where('wordBankId', 'in', wordIdentifiers).get();
-    return []; // Return empty array as a placeholder
-  };
-
-   // Placeholder function - Replace with your actual database implementation
-  const saveUserWordProgress = async (progressEntries: UserWordProgress[]): Promise<void> => {
-    console.log(`[DB Placeholder] Saving progress for ${progressEntries.length} words.`);
-    // Implement your database save/update logic here
-    // Example: Use batch writes for efficiency
-    // const batch = db.batch();
-    // progressEntries.forEach(entry => {
-    //   const docRef = db.collection('userWordProgress').doc(`${entry.userId}_${entry.wordBankId}`); // Example doc ID
-    //   batch.set(docRef, entry, { merge: true }); // Use merge to update if exists, create if not
-    // });
-    // await batch.commit();
-  };
 
   useEffect(() => {
     loadNewSessionWords();
@@ -328,27 +237,26 @@ export default function VocabularyPage() {
   const handleNextCard = useCallback((srsRating?: string) => {
     if (sessionWords.length === 0) return;
 
-    const currentWordBankId = sessionWords[currentCardIndex].wordBankId;
-
-    if (srsRating === 'easy') {
-      setMasteredWordIds(prev => new Set(prev).add(currentWordBankId));
+    const currentWord = sessionWords[currentCardIndex];
+    if (currentWord && srsRating === 'easy') {
+      setMasteredWordIds(prev => new Set(prev).add(currentWord.wordBankId));
     }
       
-    const nextIndex = (currentCardIndex + 1);
+    const nextIndex = currentCardIndex + 1;
     if (nextIndex >= sessionWords.length) {
-      // Reached end of current session, load new words and reset mastery for the new session
       loadNewSessionWords(); 
     } else {
       setCurrentCardIndex(nextIndex);
     }
-    setShowBack(false); // Always flip to front for next card
+    setShowBack(false); 
     
-    if (srsRating) {
-      console.log(`Word "${sessionWords[currentCardIndex].word}" (ID: ${currentWordBankId}) rated as: ${srsRating}.`);
-    } else {
-      console.log(`Word "${sessionWords[currentCardIndex].word}" (ID: ${currentWordBankId}) skipped.`);
+    // Placeholder for SRS update logic
+    if (srsRating && currentWord) {
+      console.log(`Word "${currentWord.word}" (ID: ${currentWord.wordBankId}) rated as: ${srsRating}.`);
+      // Here you would typically call a function to update UserWordProgress in Firestore
+      // updateUserWordProgress(authUser?.uid, currentWord.wordBankId, srsRating);
     }
-  }, [sessionWords, currentCardIndex, loadNewSessionWords]);
+  }, [sessionWords, currentCardIndex, loadNewSessionWords, authUser?.uid]);
 
   const currentWord = sessionWords[currentCardIndex];
 
@@ -389,15 +297,15 @@ export default function VocabularyPage() {
               Strengthen your vocabulary in {selectedLanguage.name} ({selectedMode.name} mode).
             </p>
           </div>
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <PlusCircle className="mr-2 h-5 w-5" /> Add New Words (Future)
+          <Button onClick={loadNewSessionWords} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <RefreshCw className="mr-2 h-5 w-5" /> New Session Words
           </Button>
         </section>
 
         <section className="flex flex-col items-center gap-6 py-8">
           {sessionWords.length > 0 && currentWord ? (
             <>
-              <div onClick={handleCardClick} className="w-full">
+              <div className="w-full" onClick={handleCardClick}>
                 <FlashcardPlaceholder 
                   front={currentWord.word} 
                   back={currentWord.translation} 
@@ -408,7 +316,7 @@ export default function VocabularyPage() {
               
               {showBack && (
                 <div className="text-center mt-4">
-                  <p className="text-md font-semibold text-muted-foreground mb-2">How well did you remember this?</p>
+                  <h4 className="text-md font-semibold text-muted-foreground mb-2">How well did you remember this?</h4>
                   <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
                     <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10 w-20 sm:w-24 text-xs sm:text-sm" onClick={() => handleNextCard('again')}>Again</Button>
                     <Button variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 w-20 sm:w-24 text-xs sm:text-sm" onClick={() => handleNextCard('hard')}>Hard</Button>
