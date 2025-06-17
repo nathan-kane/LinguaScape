@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, Zap, Target, BookOpen, Repeat, CalendarDays, TrendingUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useLearning } from '@/context/LearningContext';
+import Image from 'next/image'; // Added import for Next.js Image component
 // import type { UserWordProgress } from '@/lib/types'; // Future use
 
 // Placeholder data - replace with actual fetched data
