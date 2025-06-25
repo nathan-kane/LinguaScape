@@ -161,14 +161,14 @@ export default function DailySessionPage() {
             const allRelevantWords = data.vocabulary.map((v: any, idx: number) => ({
               wordBankId: v.wordBankId,
               word: v.wordInTargetLanguage,
-              translation: "", // Fill with translation if available
+              translation: v.dataAiHint || 'Translation not available', // Use dataAiHint as translation or a placeholder
               imageUrl: "https://placehold.co/200x150.png",
               audioUrl: "#",
               exampleSentence: v.exampleSentenceInTargetLanguage,
               wordType: v.wordType,
               dataAiHint: v.dataAiHint,
             }));
-            const shuffledWords = shuffleArray(allRelevantWords);
+            const shuffledWords = shuffleArray(allRelevantWords as DailyWordItem[]);
             setDailyWords(shuffledWords.slice(0, 5));
             setCurrentIntroWordIndex(0);
             setPracticeStage('introduction');
@@ -184,11 +184,35 @@ export default function DailySessionPage() {
           .catch(error => {
             console.error('Failed to fetch Ukrainian vocabulary:', error);
             setDailyWords([]);
+            // Add placeholder words as a fallback
+            const placeholderWords: DailyWordItem[] = [
+              { wordBankId: "ua-ph1", word: "Привіт", translation: "Hello", imageUrl: "https://placehold.co/200x150.png", audioUrl: "#", exampleSentence: "Привіт, як справи?", wordType: "other", dataAiHint: "person waving" },
+              { wordBankId: "ua-ph2", word: "Дякую", translation: "Thank you", imageUrl: "https://placehold.co/200x150.png", audioUrl: "#", exampleSentence: "Дякую за допомогу.", wordType: "other", dataAiHint: "person showing gratitude" },
+              { wordBankId: "ua-ph3", word: "Будь ласка", translation: "Please / You're welcome", imageUrl: "https://placehold.co/200x150.png", audioUrl: "#", exampleSentence: "Дайте мені кави, будь ласка.", wordType: "other", dataAiHint: "polite request" },
+              { wordBankId: "ua-ph4", word: "Вибачте", translation: "Excuse me / Sorry", imageUrl: "https://placehold.co/200x150.png", audioUrl: "#", exampleSentence: "Вибачте, де тут вихід?", wordType: "other", dataAiHint: "person apologizing" }, // Changed from 'expression'
+              { wordBankId: "ua-ph5", word: "Так", translation: "Yes", imageUrl: "https://placehold.co/200x150.png", audioUrl: "#", exampleSentence: "Так, я згоден.", wordType: "other", dataAiHint: "checkmark" }, // Changed from 'response'
+            ];
+             const shuffledWords = shuffleArray(placeholderWords as DailyWordItem[]);
+ setDailyWords(shuffledWords.slice(0, 5) as DailyWordItem[]); // Use up to 5 placeholder words
+
+            setCurrentIntroWordIndex(0);
+            setPracticeStage('introduction');
+            setRecognitionQuestion(null);
+            setSelectedOption(null);
+            setRecognitionFeedback(null);
+            setCurrentRecognitionIndex(0);
+            setMiniStoryText(null);
+            setTranslatedMiniStoryText(null);
+            setIsLoadingStory(false);
             setIsLoadingLesson(false);
           });
       } else {
         setTimeout(() => { // Simulate async fetch for other languages
           const allRelevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
+          // Ensure we have at least some words even from placeholder function
+          if (allRelevantWords.length === 0) {
+               console.warn(`Placeholder words for ${selectedLanguage.name} (${selectedMode.name} mode) returned empty.`);
+          }
           const shuffledWords = shuffleArray(allRelevantWords);
           setDailyWords(shuffledWords.slice(0, 5)); // Select 5 random words for the session
           setCurrentIntroWordIndex(0);

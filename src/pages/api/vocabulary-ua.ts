@@ -39,7 +39,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       dataAiHint: entry.defs && entry.defs.length > 0 ? entry.defs[0] : '',
     }));
 
-    res.status(200).json({ vocabulary });
+    // Shuffle and select a random subset of words
+    const shuffledVocabulary = vocabulary.sort(() => 0.5 - Math.random());
+    const dailyWordsCount = 7; // Number of words for the daily lesson
+    const dailyVocabulary = shuffledVocabulary.slice(0, dailyWordsCount);
+
+    res.status(200).json({ vocabulary: dailyVocabulary });
   } catch (error: any) {
     console.error('Error loading Ukrainian vocabulary:', error);
     res.status(500).json({ error: 'Failed to load Ukrainian vocabulary.' });
