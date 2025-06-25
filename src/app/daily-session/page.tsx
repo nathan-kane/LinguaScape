@@ -97,21 +97,8 @@ const getPlaceholderDailyWords = (languageCode: string, modeId: string): DailyWo
     ];
     return applyModeAdjustments(frenchWords, 'fr');
   } else if (languageCode === 'ua') {
-    const ukrainianWords: DailyWordItem[] = [
-      { wordBankId: "ua1", word: "Яблуко", translation: "Apple", ...commonProps, exampleSentence: "Я їм яблуко.", wordType: "noun", dataAiHint: "apple fruit" },
-      { wordBankId: "ua2", word: "Їсти", translation: "To eat", ...commonProps, exampleSentence: "Я люблю їсти фрукти.", wordType: "verb", dataAiHint: "person eating" },
-      { wordBankId: "ua3", word: "Червоний", translation: "Red", ...commonProps, exampleSentence: "Яблуко червоне.", wordType: "adjective", dataAiHint: "red color swatch" },
-      { wordBankId: "ua4", word: "Я хочу", translation: "I want", ...commonProps, exampleSentence: "Я хочу вивчати українську.", wordType: "phrase", dataAiHint: "person thinking" },
-      { wordBankId: "ua5", word: "Вода", translation: "Water", ...commonProps, exampleSentence: "Я п'ю воду.", wordType: "noun", dataAiHint: "glass water" },
-      { wordBankId: "ua6", word: "Книга", translation: "Book", ...commonProps, exampleSentence: "Це цікава книга.", wordType: "noun", dataAiHint: "interesting book" },
-      { wordBankId: "ua7", word: "Квиток", translation: "Ticket", ...commonProps, exampleSentence: "Де мій квиток?", wordType: "noun", dataAiHint: "lost ticket" },
-      { wordBankId: "ua8", word: "Готель", translation: "Hotel", ...commonProps, exampleSentence: "Готель знаходиться в центрі.", wordType: "noun", dataAiHint: "city hotel" },
-      { wordBankId: "ua9", word: "Пляж", translation: "Beach", ...commonProps, exampleSentence: "Ми йдемо на пляж.", wordType: "noun", dataAiHint: "going to beach" },
-      { wordBankId: "ua10", word: "Допомога", translation: "Help", ...commonProps, exampleSentence: "Мені потрібна допомога.", wordType: "noun", dataAiHint: "need help" },
-      { wordBankId: "ua11", word: "Дякую", translation: "Thank you", ...commonProps, exampleSentence: "Щиро дякую!", wordType: "phrase", dataAiHint: "sincere thanks" },
-      { wordBankId: "ua12", word: "Будь ласка", translation: "Please", ...commonProps, exampleSentence: "Дайте, будь ласка, меню.", wordType: "phrase", dataAiHint: "asking please" },
-    ];
-    return applyModeAdjustments(ukrainianWords, 'ua');
+    // Will be fetched asynchronously in useEffect
+    return [];
   }
   // Default English words if no match (expanded list)
     const englishWords: DailyWordItem[] = [
@@ -163,24 +150,60 @@ export default function DailySessionPage() {
   const [practiceStage, setPracticeStage] = useState<'introduction' | 'recognition' | 'story' | 'chat'>('introduction');
 
   useEffect(() => {
-    if (!isLoadingPreferences && selectedLanguage && selectedMode && nativeLanguage) { 
+    if (!isLoadingPreferences && selectedLanguage && selectedMode && nativeLanguage) {
       setIsLoadingLesson(true);
-      setTimeout(() => { // Simulate async fetch
-        const allRelevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
-        const shuffledWords = shuffleArray(allRelevantWords);
-        setDailyWords(shuffledWords.slice(0, 5)); // Select 5 random words for the session
-        setCurrentIntroWordIndex(0);
-        setPracticeStage('introduction');
-        // Reset other stage-specific states
-        setRecognitionQuestion(null);
-        setSelectedOption(null);
-        setRecognitionFeedback(null);
-        setCurrentRecognitionIndex(0);
-        setMiniStoryText(null);
-        setTranslatedMiniStoryText(null);
-        setIsLoadingStory(false);
-        setIsLoadingLesson(false);
-      }, 500); 
+      if (selectedLanguage.code === 'ua') {
+        // Fetch from API for Ukrainian
+        fetch('/api/vocabulary-ua')
+          .then(res => res.json())
+          .then(data => {
+            // Map API response to DailyWordItem[]
+            const allRelevantWords = data.vocabulary.map((v: any, idx: number) => ({
+              wordBankId: v.wordBankId,
+              word: v.wordInTargetLanguage,
+              translation: "", // Fill with translation if available
+              imageUrl: "https://placehold.co/200x150.png",
+              audioUrl: "#",
+              exampleSentence: v.exampleSentenceInTargetLanguage,
+              wordType: v.wordType,
+              dataAiHint: v.dataAiHint,
+            }));
+            const shuffledWords = shuffleArray(allRelevantWords);
+            setDailyWords(shuffledWords.slice(0, 5));
+            setCurrentIntroWordIndex(0);
+            setPracticeStage('introduction');
+            setRecognitionQuestion(null);
+            setSelectedOption(null);
+            setRecognitionFeedback(null);
+            setCurrentRecognitionIndex(0);
+            setMiniStoryText(null);
+            setTranslatedMiniStoryText(null);
+            setIsLoadingStory(false);
+            setIsLoadingLesson(false);
+          })
+          .catch(error => {
+            console.error('Failed to fetch Ukrainian vocabulary:', error);
+            setDailyWords([]);
+            setIsLoadingLesson(false);
+          });
+      } else {
+        setTimeout(() => { // Simulate async fetch for other languages
+          const allRelevantWords = getPlaceholderDailyWords(selectedLanguage.code, selectedMode.id);
+          const shuffledWords = shuffleArray(allRelevantWords);
+          setDailyWords(shuffledWords.slice(0, 5)); // Select 5 random words for the session
+          setCurrentIntroWordIndex(0);
+          setPracticeStage('introduction');
+          // Reset other stage-specific states
+          setRecognitionQuestion(null);
+          setSelectedOption(null);
+          setRecognitionFeedback(null);
+          setCurrentRecognitionIndex(0);
+          setMiniStoryText(null);
+          setTranslatedMiniStoryText(null);
+          setIsLoadingStory(false);
+          setIsLoadingLesson(false);
+        }, 500);
+      }
     }
   }, [selectedLanguage, selectedMode, nativeLanguage, isLoadingPreferences]);
 

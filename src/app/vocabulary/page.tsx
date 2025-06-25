@@ -44,7 +44,7 @@ const FlashcardDisplay = ({ word, showBack, onFlip }: { word: SessionDisplayWord
       className="relative w-full max-w-2xl mx-auto h-[280px] sm:h-[320px] rounded-xl shadow-xl perspective group cursor-pointer"
       onClick={onFlip}
     >
-      <div className={`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`}>
+      <div className={`${`relative w-full h-full preserve-3d transition-transform duration-700 ${showBack ? 'rotate-y-180' : ''}`.trim()}`}>
         {/* Front of card */}
         <div className="absolute w-full h-full backface-hidden bg-card border border-border rounded-xl flex flex-col items-center justify-center p-6 text-center">
           <h3 className="text-3xl sm:text-4xl font-bold text-foreground">{word.wordInTargetLanguage}</h3>
@@ -88,6 +88,14 @@ export default function VocabularyPage() {
   const [totalWordsInAIModePool, setTotalWordsInAIModePool] = useState(0); // Represents the larger pool AI could generate for this mode
   const [masteredWordIds, setMasteredWordIds] = useState<Set<string>>(new Set());
 
+  // Utility to fetch Ukrainian vocabulary from backend
+  const fetchUkrainianVocabulary = async (): Promise<FetchedWordItem[]> => {
+    const res = await fetch('/api/vocabulary-ua'); // Next.js API route
+    if (!res.ok) throw new Error('Failed to fetch Ukrainian vocabulary');
+    const data = await res.json();
+    return data.vocabulary as FetchedWordItem[];
+  };
+
   const loadNewSessionWords = useCallback(async () => {
     if (isLoadingPreferences || !selectedLanguage || !selectedMode || !nativeLanguage) {
       setIsLoadingSession(false);
@@ -100,31 +108,26 @@ export default function VocabularyPage() {
     setSessionWords([]); // Clear previous session
 
     try {
-      const input: GenerateVocabularyInput = {
-        languageName: selectedLanguage.name,
-        languageCode: selectedLanguage.code,
-        modeName: selectedMode.name, 
-        nativeLanguageName: nativeLanguage.name, // For context, though flow won't translate
-        count: 15, // Fetch a pool from AI
-      };
-      
-      const result = await generateVocabulary(input);
-
-      if (!result || !result.vocabulary || result.vocabulary.length === 0) {
-        throw new Error("AI flow did not return any vocabulary.");
+      let fetchedItems: FetchedWordItem[] = [];
+      if (selectedLanguage.code === 'ua') {
+        // Use backend static vocabulary for Ukrainian
+        fetchedItems = await fetchUkrainianVocabulary();
+      } else {
+        // Fallback to AI flow for other languages
+        const input: GenerateVocabularyInput = {
+          languageName: selectedLanguage.name,
+          languageCode: selectedLanguage.code,
+          modeName: selectedMode.name,
+          nativeLanguageName: nativeLanguage.name,
+          count: 15,
+        };
+        const result = await generateVocabulary(input);
+        fetchedItems = result.vocabulary;
       }
-      
-      // The flow now returns FetchedWordItem structure
-      const fetchedItems: FetchedWordItem[] = result.vocabulary.map(v => ({
-        wordBankId: v.wordBankId,
-        wordInTargetLanguage: v.wordInTargetLanguage,
-        exampleSentenceInTargetLanguage: v.exampleSentenceInTargetLanguage,
-        wordType: v.wordType,
-        dataAiHint: v.dataAiHint,
-        imageUrl: "https://placehold.co/600x400.png", 
-        audioUrl: "#", 
-      }));
-      
+      if (!fetchedItems || fetchedItems.length === 0) {
+        throw new Error("No vocabulary returned from backend or AI flow.");
+      }
+
       const shuffledPool = shuffleArray(fetchedItems);
       const wordsForThisSession: SessionDisplayWord[] = shuffledPool.slice(0, WORDS_PER_SESSION).map(w => ({
         ...w,
@@ -257,7 +260,7 @@ export default function VocabularyPage() {
               Native translation to {nativeLanguage.name} on demand.
             </p>
           </div>
-          <Button onClick={loadNewSessionWords} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoadingSession}>
+          <Button onClick={loadNewSessionWords} className={"bg-primary hover:bg-primary/90 text-primary-foreground".trim()} disabled={isLoadingSession}>
             <RefreshCw className="mr-2 h-5 w-5" /> {isLoadingSession ? "Loading..." : "New Session Words"}
           </Button>
         </section>
@@ -283,7 +286,7 @@ export default function VocabularyPage() {
                 </div>
               )}
 
-              <Button variant="link" onClick={() => handleNextCard()} className="mt-2 text-primary text-sm" disabled={isLoadingSession || currentDisplayWord?.isLoadingTranslation}>
+              <Button variant="link" onClick={() => handleNextCard()} className={"mt-2 text-primary text-sm".trim()} disabled={isLoadingSession || currentDisplayWord?.isLoadingTranslation}>
                 Skip to Next Card <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
               
@@ -294,7 +297,7 @@ export default function VocabularyPage() {
               </p>
             </>
           ) : (
-            <Card className="p-8 text-center bg-card w-full max-w-md">
+            <Card className={"p-8 text-center bg-card w-full max-w-md".trim()}>
               <RefreshCw className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <CardTitle>No Words Loaded</CardTitle>
               <CardDescription className="my-2">

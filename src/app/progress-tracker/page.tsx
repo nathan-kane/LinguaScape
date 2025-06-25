@@ -66,9 +66,9 @@ export default function ProgressTrackerPage() {
 
       const fetchedWords: DailyWordItem[] = result.vocabulary.map(v => ({
         wordBankId: v.wordBankId,
-        word: v.word,
-        translation: v.translation,
-        exampleSentence: v.exampleSentence,
+        word: v.wordInTargetLanguage,
+        translation: "", // Placeholder: translation should be fetched separately
+        exampleSentence: v.exampleSentenceInTargetLanguage,
         wordType: v.wordType,
         dataAiHint: v.dataAiHint,
         imageUrl: "https://placehold.co/200x150.png", 
@@ -190,10 +190,7 @@ export default function ProgressTrackerPage() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                       <div className="flex-1">
                         <h4 className="text-lg font-semibold text-foreground">{word.word} <span className="text-sm text-muted-foreground">({word.translation})</span></h4>
-                        <p className={cn(
-                          "text-sm font-medium",
-                           "text-blue-600" // All start as 'learning'
-                        )}>
+                        <p className={cn("text-sm font-medium", "text-blue-600").trim()}>
                           Status: {word.status.charAt(0).toUpperCase() + word.status.slice(1)}
                         </p>
                       </div>

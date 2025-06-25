@@ -131,7 +131,7 @@ export default function PronunciationPage() {
                   "w-full sm:w-auto text-lg px-8 py-6 transition-all duration-300 ease-in-out",
                   isRecording ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90",
                   "text-primary-foreground"
-                )}
+                ).trim()}
               >
                 <Mic className="mr-2 h-6 w-6" />
                 {isRecording ? "Stop Recording" : "Start Recording"}
